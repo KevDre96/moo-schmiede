@@ -111,6 +111,17 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 @media(max-width:1000px){.office-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.office-stats .stat{min-height:135px}.office-areas{grid-template-columns:repeat(2,minmax(0,1fr))}.office-hero h2{font-size:32px}.office-hero p br{display:none}.office-hero{padding:27px!important}}
 @media(max-width:760px){.sidebar{width:260px}.workspace{margin-left:0}header{padding:17px 20px;min-height:82px}header h1{font-size:24px}.brand{min-height:180px}.brand img{height:90px;width:165px}.brand>span{font-size:10px}.office-hero h2{font-size:31px}.office-hero p{font-size:12px}.office-hero .eyebrow{max-width:none;letter-spacing:1.4px}.office-stats .stat strong{font-size:28px}.office-stats .stat{padding:22px 14px 17px;min-height:140px}.office-stats .stat>.muted{font-size:10px}.office-areas .area-card{min-height:147px}.search input{width:100%}.search::after{display:none}.office-stats .stat-icon{right:10px}.section-head .actions{width:100%;flex-wrap:wrap}.section-head .actions button{flex:1}.table-wrap th{font-size:10px}.ingredient-tags{min-width:220px}#toast{left:50%}}
 
+
+/* Adressbuch-Vorschlaege im Bestellformular */
+.order-contact-field{position:relative;min-width:0}
+.order-contact-field>label{cursor:text}
+.order-contact-field>input{width:100%}
+.order-contact-suggestions:not([hidden]){display:flex;flex-direction:column;gap:3px;position:absolute;top:100%;left:0;right:0;z-index:50;background:#191817;border:1px solid #937640;box-shadow:0 18px 38px #000b;border-radius:9px;margin-top:6px;padding:5px;max-height:255px;overflow-y:auto}
+.order-contact-option{width:100%;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:3px;border:1px solid transparent;border-radius:6px;background:transparent;color:#eee9dc;padding:9px 11px;cursor:pointer;white-space:normal}
+.order-contact-option strong{font-weight:700;font-size:12px}
+.order-contact-option small{font-size:10px;color:#c2b28f;line-height:1.4;overflow-wrap:anywhere}
+.order-contact-option:hover,.order-contact-option.active,.order-contact-option:focus-visible{background:#d8b56520;border-color:#a58b545c;outline:none}
+@media(max-width:760px){.order-contact-suggestions:not([hidden]){max-height:210px}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -429,7 +440,7 @@ function orderModal(order){
   <div class="picker-total"><span>Geschätzter Bestellwert</span><b id="order-picked-total">0,00 $</b></div>
  </section>`;
  const form=field('Name der Bestellung','title',order?.title||'','text','required placeholder="z. B. Büchsenmacher Blackwater"')+
- `<label class="field">Kunde / Gewerbe<input name="customer" list="customer-options" value="${esc(order?.customer||'')}" required><datalist id="customer-options">${state.contacts.map(c=>`<option value="${esc(c.name)}">${esc(c.telegram)}</option>`).join('')}</datalist></label>`+
+ `<div class="field order-contact-field"><label for="order-customer-input">Kunde / Gewerbe</label><input id="order-customer-input" name="customer" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="order-contact-suggestions" aria-expanded="false" placeholder="Name aus dem Adressbuch eingeben" value="${esc(order?.customer||'')}" required><div class="order-contact-suggestions" id="order-contact-suggestions" role="listbox" aria-label="Passende Adressbuch-Kontakte" hidden></div></div>`+
  field('Telegrammnummer','telegram',order?.telegram||'')+
  '<div class="picker-intro">Wähle unten deine Schmiedeprodukte aus.</div>'+picker+
  textarea('Notizen zur Bestellung','notes',order?.notes||'');
@@ -483,7 +494,63 @@ function orderModal(order){
  });
  search.addEventListener('input',showCatalog);
  showCatalog();showSelected();
- dialog.querySelector('[name=customer]').onchange=e=>{const c=state.contacts.find(c=>c.name===e.target.value);if(c)dialog.querySelector('[name=telegram]').value=c.telegram;};
+ // Kontaktvorschläge direkt bei Eingabe, mit eindeutiger Telegrammnummer.
+ const customerInput=dialog.querySelector('#order-customer-input');
+ const telegramInput=dialog.querySelector('[name=telegram]');
+ const contactList=dialog.querySelector('#order-contact-suggestions');
+ const normalizeContact=v=>String(v||'').trim().toLocaleLowerCase('de-DE');
+ let matchesContacts=[],activeContact=-1;
+ function hideContactList(){
+   contactList.hidden=true;contactList.innerHTML='';
+   customerInput.setAttribute('aria-expanded','false');
+   customerInput.removeAttribute('aria-activedescendant');
+   matchesContacts=[];activeContact=-1;
+ }
+ function showContactList(){
+   const typed=normalizeContact(customerInput.value);
+   matchesContacts=typed?state.contacts.filter(c=>normalizeContact(c.name).startsWith(typed)).slice(0,30):[];
+   activeContact=-1;
+   if(!matchesContacts.length){hideContactList();return;}
+   contactList.innerHTML=matchesContacts.map((c,index)=>
+     `<button type="button" class="order-contact-option" id="order-contact-opt-${index}" data-suggestion-index="${index}" role="option" aria-selected="false"><strong>${esc(c.name)}</strong><small>${esc(c.telegram||'Ohne Telegrammnummer')}${c.note?' · '+esc(c.note):''}</small></button>`
+   ).join('');
+   contactList.hidden=false;
+   customerInput.setAttribute('aria-expanded','true');
+ }
+ function selectContact(c){
+   if(!c)return;
+   customerInput.value=c.name;
+   telegramInput.value=c.telegram||'';
+   hideContactList();
+   customerInput.focus();
+ }
+ customerInput.addEventListener('focus',showContactList);
+ customerInput.addEventListener('input',()=>{telegramInput.value='';showContactList();});
+ customerInput.addEventListener('keydown',event=>{
+   if((event.key==='ArrowDown'||event.key==='ArrowUp')&&matchesContacts.length){
+     event.preventDefault();
+     activeContact=(activeContact+(event.key==='ArrowDown'?1:-1)+matchesContacts.length)%matchesContacts.length;
+     contactList.querySelectorAll('[data-suggestion-index]').forEach((b,i)=>{
+       const active=i===activeContact;
+       b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));
+       if(active){customerInput.setAttribute('aria-activedescendant',b.id);b.scrollIntoView({block:'nearest'});}
+     });
+   }else if(event.key==='Enter'&&!contactList.hidden&&matchesContacts.length){
+     event.preventDefault();selectContact(matchesContacts[activeContact<0?0:activeContact]);
+   }else if(event.key==='Escape'&&!contactList.hidden){
+     event.preventDefault();hideContactList();
+   }
+ });
+ contactList.addEventListener('pointerdown',event=>{
+   if(event.target.closest('[data-suggestion-index]'))event.preventDefault();
+ });
+ contactList.addEventListener('click',event=>{
+   const b=event.target.closest('[data-suggestion-index]');
+   if(b)selectContact(matchesContacts[Number(b.dataset.suggestionIndex)]);
+ });
+ customerInput.addEventListener('blur',event=>{
+   if(!contactList.contains(event.relatedTarget))hideContactList();
+ });
 }
 function lineModal(order,line,calculator=false){
  if(line?.done){toast('Bitte zuerst den Fertig-Haken entfernen, bevor du diese Position änderst.',true);return;}
