@@ -525,6 +525,17 @@ function orderModal(order){
    const additions=selectedProducts.map(l=>({id:uid(),product:l.product,qty:l.qty,status:'open',mode:'raw',note:'',done:false,booking:{}}));
    if(order){const current=state.orders.find(o=>o.id===order.id);Object.assign(current,values);current.lines.push(...additions);}
    else{const created={id:uid(),...values,number:'',lines:additions};state.orders.push(created);selectedOrder=created.id;view='orders';location.hash='orders';}
+   // Bestellkunden mit Telegrammnummer beim Speichern im Adressbuch ergänzen.
+   // Gleichnamige Kontakte anhand ihrer Nummer unterscheiden.
+   const cleanName=name=>String(name||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('de-DE');
+   const cleanTelegram=number=>String(number||'').trim().replace(/[\s-]+/g,'').toLocaleUpperCase('de-DE');
+   const enteredName=cleanName(values.customer);
+   const enteredTelegram=cleanTelegram(values.telegram);
+   const alreadySaved=state.contacts.some(c=>
+     cleanName(c.name)===enteredName &&
+     (!enteredTelegram || cleanTelegram(c.telegram)===enteredTelegram)
+   );
+   if(!alreadySaved)state.contacts.push({id:uid(),name:values.customer,telegram:values.telegram,note:''});
  });
  const dialog=$('#dialog');dialog.classList.add('order-dialog');
  const list=dialog.querySelector('#order-product-catalog');
