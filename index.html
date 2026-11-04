@@ -122,6 +122,19 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .order-contact-option small{font-size:10px;color:#c2b28f;line-height:1.4;overflow-wrap:anywhere}
 .order-contact-option:hover,.order-contact-option.active,.order-contact-option:focus-visible{background:#d8b56520;border-color:#a58b545c;outline:none}
 @media(max-width:760px){.order-contact-suggestions:not([hidden]){max-height:210px}}
+
+/* Rezeptverwaltung: frei editierbare Materialliste */
+.recipe-edit-box{display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid #625131;border-radius:10px;background:#211e19;min-width:0}
+.recipe-edit-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.recipe-edit-toolbar strong{font:700 17px Georgia,serif;color:#e9d7b0}
+.recipe-edit-toolbar button{min-height:37px}
+.recipe-edit-box>small{font-size:11px;color:#b8aa91}
+.recipe-edit-list{display:flex;flex-direction:column;gap:9px;min-width:0;max-height:48vh;overflow-y:auto}
+.recipe-edit-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(100px,.6fr) auto;gap:10px;align-items:end;border:1px solid #4a4031;background:#151412;padding:9px;border-radius:8px}
+.recipe-edit-row label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#c5beae;min-width:0}
+.recipe-edit-row select,.recipe-edit-row input{width:100%;min-width:0}
+.recipe-edit-row button{min-height:39px}
+@media(max-width:600px){.recipe-edit-box{padding:10px}.recipe-edit-row{grid-template-columns:minmax(0,1fr) minmax(85px,.65fr)}.recipe-edit-row .recipe-remove-ingredient{grid-column:1/-1;justify-self:end}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -415,7 +428,7 @@ function requirementTable(map,type='raw'){const current=stock(state);const keys=
 function manufactureView(){const lines=calcLines.length?calcLines:openLines();let p=plan(state,lines);return heading('Herstellungsrechner','Von der Bestellung bis zum Erz – alle Rezeptstufen werden berücksichtigt.',button('Offene Bestellungen verwenden','reset-calculator','secondary'))+`<section class="panel calculator"><div class="section-head"><div><h3>${calcLines.length?'Eigene Planung':'Alle offenen Bestellungen'}</h3><p>${calcLines.length?'Die eigene Planung ersetzt hier die Auftragsauswahl.':'Lager und Zwischenprodukte sind bereits eingerechnet.'}</p></div>${button(icon('plus')+' Produkt planen','new-calc','secondary')}</div>${calcLines.length?calcLines.map((l,i)=>`<div class="calc-line"><b>${esc(l.product)}</b><span>${number(l.qty)} Stück</span>${button('Entfernen','remove-calc','text',`data-id="${i}"`)}</div>`).join(''):`<p class="muted">${openLines().length} offene Produktpositionen aus ${state.orders.filter(o=>o.lines.some(l=>!l.done&&l.qty>0&&l.status!=='cancel')).length} Bestellungen</p>`}</section>${p.errors.map(e=>`<p class="error-box">${esc(e)}. Bitte unter Rezepte ergänzen.</p>`).join('')}<div class="two-col"><section class="panel">${heading('Noch herstellen','Benötigte End- und Zwischenprodukte.')}${requirementTable(p.make)}</section><section class="panel">${heading('Noch beschaffen','Rohstoffe nach Abzug des vorhandenen Lagers.')}${requirementTable(p.buy,'buy')}</section></div><p class="footnote">Es wird anteilig pro gewünschtem Stück gerechnet, wie in deiner Tabelle. Keine automatische Aufrundung auf Herstellungsdurchgänge. Fehlende Rezeptmengen werden ausdrücklich gemeldet.</p>`;}
 const smeltProducts=['Rennhufeisen','Goldbarren','Messingbarren','Kupferbarren','Silberbarren','Gehärteter Eisenbarren','Eisenbarren','Bleibarren'];
 function smeltView(){let totals={},raw={},errors=[],active=false;for(const k of smeltProducts){const n=smeltQty[k]||0;if(n>0){active=true;try{for(const [item,qty]of Object.entries(explode(state,k,n,'parts')))totals[item]=(totals[item]||0)+qty;for(const [item,qty]of Object.entries(explode(state,k,n,'raw')))raw[item]=(raw[item]||0)+qty;}catch(e){errors.push(e.message);}}}return heading('Schmelze','Barren, Rennhufeisen und dein permanenter Eisenhammer.')+`<div class="two-col"><section class="panel">${heading('Was soll in die Schmelze?','Gewünschte Stückzahl eingeben.')}${table(['Produkt','Gewünschte Anzahl','Ausgabe je Rezept'],smeltProducts.map(k=>`<tr><td><b>${esc(k)}</b></td><td><input class="smelt-qty" data-item="${esc(k)}" type="text" inputmode="decimal" autocomplete="off" pattern="[0-9]+([.,][0-9]+)?" value="${smeltQty[k]>0?smeltQty[k]:''}" aria-label="Anzahl ${esc(k)}"></td><td class="num">${number(state.recipes[k]?.yield)}</td></tr>`))}<div class="hammer" id="smelt-hammer">${icon('manufacture')}<div><b>${active?'1 Eisenhammer benötigt':'Eisenhammer'}</b><small>Permanent · wird nicht verbraucht oder multipliziert</small></div></div></section><section id="smelt-results"><section class="panel">${heading('Direkte Zutaten','Gesamtbedarf für alle eingetragenen Produkte.')}${requirementTable(totals)}</section>${errors.map(e=>`<p class="error-box">${esc(e)}</p>`).join('')}<details class="panel"><summary>Bis zu den Rohstoffen aufschlüsseln</summary><p class="muted">Bruttobedarf ohne Lagerabzug.</p>${requirementTable(raw)}</details></section></div><p class="footnote">Anteilig gerechnet: z. B. 1 Goldbarren = 1 Kohle + 10 Goldnuggets. Der Rechner bucht keine Lagerbewegungen.</p>`;}
-function recipesView(){const list=products().filter(k=>matches(k,...state.recipes[k].ingredients.map(i=>i.item)));return heading('Rezeptübersicht','Alle Rezepte, Ausgabemengen und Zutaten aus deiner Tabelle.')+`<section class="panel"><div class="toolbar"><span class="muted">${list.length} von ${products().length} Rezepten</span><small>Rezeptmengen mit „Bearbeiten“ ändern.</small></div>${table(['Produkt','Ausgabe je Herstellung','Zutaten je Rezept','Status','Aktionen'],list.map(k=>{const r=state.recipes[k],missing=r.ingredients.some(i=>typeof i.qty!=='number');return `<tr><td><b>${esc(k)}</b></td><td class="num">${number(r.yield)} Stück</td><td><div class="ingredient-tags">${r.ingredients.map(i=>`<span class="tag ${i.qty===null?'negative':''}">${i.qty===null?'?':number(i.qty)} × ${esc(i.item)}</span>`).join('')}</div></td><td><span class="badge ${missing?'open':'done'}">${missing?'Menge fehlt':'Vollständig'}</span></td><td>${button('Bearbeiten','edit-recipe','text',`data-item="${esc(k)}"`)}</td></tr>`}))}</section>`;}
+function recipesView(){const list=products().filter(k=>matches(k,...state.recipes[k].ingredients.map(i=>i.item)));return heading('Rezeptübersicht','Alle Rezepte, Ausgabemengen und Zutaten aus deiner Tabelle.')+`<section class="panel"><div class="toolbar"><span class="muted">${list.length} von ${products().length} Rezepten</span><small>Mit „Bearbeiten“ Mengen und Materialien jederzeit anpassen.</small></div>${table(['Produkt','Ausgabe je Herstellung','Zutaten je Rezept','Status','Aktionen'],list.map(k=>{const r=state.recipes[k],missing=!r.ingredients.length||r.ingredients.some(i=>typeof i.qty!=='number');return `<tr><td><b>${esc(k)}</b></td><td class="num">${number(r.yield)} Stück</td><td><div class="ingredient-tags">${r.ingredients.map(i=>`<span class="tag ${i.qty===null?'negative':''}">${i.qty===null?'?':number(i.qty)} × ${esc(i.item)}</span>`).join('')}</div></td><td><span class="badge ${missing?'open':'done'}">${missing?'Menge fehlt':'Vollständig'}</span></td><td>${button('Bearbeiten','edit-recipe','text',`data-item="${esc(k)}"`)}</td></tr>`}))}</section>`;}
 function pricesView(){const list=(priceTab==='product'?products():items().filter(k=>!state.recipes[k])).filter(k=>matches(k));return heading('Preise & Kalkulation','Eigene Endpreise und Rohstoffpreise – Änderungen gelten sofort für offene Bestellungen.')+`<div class="panel"><div class="toolbar"><div class="tabs"><button data-action="price-tab" data-id="product" class="${priceTab==='product'?'active':''}">Produktpreise</button><button data-action="price-tab" data-id="raw" class="${priceTab==='raw'?'active':''}">Rohstoffpreise</button></div><small class="muted">0 $ ist ein gültiger Preis. Leer bedeutet: Preis fehlt.</small></div>${table(priceTab==='product'?['Produkt','Verkaufspreis / Stück','Materialkosten / Stück','Differenz','']:['Rohstoff','Einkaufspreis / Stück',''],list.map(k=>{const p=priceTab==='product'?state.prices[k]:state.rawPrices[k],c=materialCost(state,k);return `<tr><td><b>${esc(k)}</b></td><td class="num gold">${money(p)}</td>${priceTab==='product'?`<td class="num">${money(c)}</td><td class="num ${c!==null&&typeof p==='number'&&p-c<0?'negative':'positive'}">${c!==null&&typeof p==='number'?money(p-c):'—'}</td>`:''}<td>${button('Preis ändern','edit-price','text',`data-item="${esc(k)}"`)}</td></tr>`}))}</div><p class="footnote">Materialkosten werden über alle Rezeptstufen berechnet. Arbeitszeit und zusätzliche Aufschläge sind nicht enthalten.</p>`;}
 function contactsView(){const list=state.contacts.filter(c=>matches(c.name,c.telegram,c.note));return heading('Adressbuch','Kunden, Telegrammnummern und deine persönlichen Notizen.',button(icon('plus')+' Neuer Kontakt','new-contact'))+`<div class="panel">${table(['Name / Gewerbe','Telegramm','Notizen',''],list.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td><span class="tag">${esc(c.telegram||'—')}</span></td><td>${esc(c.note)}</td><td>${button('Bearbeiten','edit-contact','text',`data-id="${c.id}"`)}</td></tr>`))}</div>`;}
 function settingsView(){return heading('Sicherung & Daten','Deine Werkstattdaten liegen in deiner gemeinsamen Supabase-Datenbank.')+`<div class="two-col"><section class="panel settings-card"><span class="mini-icon">${icon('download')}</span><h3>Sicherung herunterladen</h3><p>Speichert Bestellungen, Lager, Einkäufe, Rezepte, Preise und Kontakte in einer JSON-Datei. Regelmäßig sichern – besonders vor einem Gerätewechsel.</p>${button(icon('download')+' Sicherung exportieren','export')}</section><section class="panel settings-card"><span class="mini-icon">${icon('inventory')}</span><h3>Sicherung wiederherstellen</h3><p>Öffnet eine zuvor exportierte Sicherung. Die gemeinsamen Cloud-Daten werden nach einer Bestätigung ersetzt.</p><label class="button secondary" for="import-file">Sicherungsdatei auswählen</label><input id="import-file" type="file" accept="application/json,.json" hidden></section></div><section class="panel settings-card"><h3>Speicher & Zusammenarbeit</h3><p>Gemeinsame Speicherung über Supabase für alle berechtigten Benutzer. Änderungen werden automatisch gespeichert und zwischen Geräten synchronisiert. Bei einem Konflikt zuerst eine Sicherung exportieren.</p><p>Die Google-Tabelle wird nicht synchronisiert. Ausgangspunkt dieser Webseite ist der übernommene Tabellenstand vom ${date(state.snapshot)}. Bereits vorhandene Lagerbestände wurden als Ausgangsbestand übernommen.</p><p>Die GitHub-Webseite zeigt Verwaltungsdaten erst nach dem Login. Private Originaldaten befinden sich nicht im öffentlichen Website-Paket.</p><div class="info-grid"><span>Letzte Speicherung <b>${lastSaved?new Date(lastSaved).toLocaleString('de-DE'):'Noch keine Änderungen'}</b></span><span>Bestellungen <b>${state.orders.length}</b></span><span>Rezepte <b>${products().length}</b></span><span>Einkäufe <b>${state.purchases.length}</b></span></div>${button('Tabellen als CSV exportieren','export-csv','secondary')}</section><section class="panel settings-card"><h3>Bestandskorrekturen</h3><p>Diese Einträge gleichen gezählte Bestände ab und ändern keine Einkaufskosten.</p>${state.adjustments.length?table(['Datum','Artikel','Änderung','Grund'],state.adjustments.slice().reverse().map(a=>`<tr><td>${date(a.date)}</td><td>${esc(a.item)}</td><td class="num">${a.qty>0?'+':''}${number(a.qty)}</td><td>${esc(a.note)}</td></tr>`)):'<p class="muted">Noch keine Bestandskorrekturen.</p>'}</section>`;}
@@ -425,6 +438,66 @@ function select(label,name,options,value,blank=true){return `<label class="field
 function textarea(label,name,value=''){return `<label class="field span2">${label}<textarea name="${name}" rows="3">${esc(value)}</textarea></label>`;}
 function modal(title,content,save,other=''){const dialog=$('#dialog');dialog.classList.remove('order-dialog');dialog.innerHTML=`<form id="modal-form"><div class="dialog-head"><div class="eyebrow">MOO SCHMIEDE</div><button type="button" class="close" aria-label="Schließen">×</button><h2>${title}</h2></div><div class="form-grid">${content}</div><p id="form-error" class="negative" role="alert"></p><div class="dialog-actions">${other}<div class="push"></div><button type="button" class="secondary close">Abbrechen</button><button type="submit" class="primary">Speichern</button></div></form>`;dialog.querySelectorAll('.close').forEach(b=>b.onclick=()=>dialog.close());$('#modal-form').onsubmit=e=>{e.preventDefault();const old=clone(state);try{save(new FormData(e.target));persist('Gespeichert');dialog.close();render();}catch(error){state=old;$('#form-error').textContent=error.message;}};dialog.showModal();}
 const nval=(f,key,blank=false)=>{const s=f.get(key);if(blank&&(s===null||s===''))return null;const n=Number(s);if(s===null||s===''||!Number.isFinite(n)||n<0)throw new Error('Bitte eine gültige Zahl ab 0 eingeben.');return n;};
+
+function editRecipeModal(product){
+  const recipe=state.recipes[product];
+  if(!recipe)throw new Error('Dieses Rezept existiert nicht.');
+  const candidates=items().filter(name=>name!==product);
+  modal('Rezept: '+esc(product),
+    field('Stück je Herstellung','yield',recipe.yield,'number','min="0.001" step="any" required')+
+    '<p class="form-hint span2">Zutaten und Mengen für einen Herstellungsvorgang. Du kannst Materialien hinzufügen, ändern oder entfernen. Ein leeres Mengenfeld bedeutet: Menge fehlt.</p>'+
+    '<div class="recipe-edit-box span2"><div class="recipe-edit-toolbar"><strong>Benötigte Materialien</strong><button type="button" class="secondary" id="recipe-add-ingredient">+ Zutat hinzufügen</button></div><div id="recipe-edit-list" class="recipe-edit-list"></div><small>Keine Zutaten oder eine fehlende Menge = Rezept unvollständig.</small></div>',
+    form=>{
+      const yieldCount=nval(form,'yield');
+      if(yieldCount<=0)throw new Error('Die Ausgabemenge muss größer als 0 sein.');
+      const ingredientRows=[...document.querySelectorAll('#recipe-edit-list .recipe-edit-row')];
+      const ingredients=ingredientRows.map(row=>{
+        const material=row.querySelector('.recipe-edit-material').value;
+        const raw=row.querySelector('.recipe-edit-amount').value.trim();
+        if(!material||!Object.hasOwn(state.inventory,material))throw new Error('Bitte für jede Zutat ein gültiges Material auswählen.');
+        if(raw!==''&&!/^\d+(?:[.,]\d+)?$/.test(raw))throw new Error('Ungültige Menge bei '+material+'.');
+        const qty=raw===''?null:Number(raw.replace(',','.'));
+        if(qty!==null&&(!Number.isFinite(qty)||qty<0))throw new Error('Ungültige Menge bei '+material+'.');
+        return {item:material,qty};
+      });
+      if(new Set(ingredients.map(ing=>ing.item)).size!==ingredients.length)throw new Error('Ein Material darf nicht mehrfach im selben Rezept vorkommen.');
+      // Verhindert direkte und verschachtelte Rezeptkreisläufe, ohne andere Rezepte anzutasten.
+      const seen=new Set();
+      function reachesProduct(name){
+        if(name===product)return true;
+        if(seen.has(name))return false;
+        seen.add(name);
+        for(const ing of state.recipes[name]?.ingredients||[])if(reachesProduct(ing.item))return true;
+        return false;
+      }
+      for(const ing of ingredients){seen.clear();if(reachesProduct(ing.item))throw new Error('Dieses Material würde einen Rezeptkreislauf erzeugen: '+ing.item);}
+      recipe.yield=yieldCount;
+      recipe.ingredients=ingredients;
+    }
+  );
+  const list=document.querySelector('#recipe-edit-list');
+  const add=document.querySelector('#recipe-add-ingredient');
+  function addRow(ingredient={item:'',qty:null},focus=false){
+    if(list.children.length>=30){toast('Maximal 30 Zutaten pro Rezept.',true);return;}
+    const row=document.createElement('div');
+    row.className='recipe-edit-row';
+    row.innerHTML=
+      '<label>Material<select class="recipe-edit-material" required><option value="">Zutat auswählen …</option>'+
+      candidates.map(name=>'<option value="'+esc(name)+'" '+(name===ingredient.item?'selected':'')+'>'+esc(name)+'</option>').join('')+
+      '</select></label>'+
+      '<label>Menge<input class="recipe-edit-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="Menge fehlt" value="'+(ingredient.qty===null||ingredient.qty===undefined?'':esc(ingredient.qty))+'"></label>'+
+      '<button class="secondary recipe-remove-ingredient" type="button" aria-label="Zutat entfernen">Entfernen</button>';
+    list.appendChild(row);
+    if(focus)row.querySelector('select').focus();
+  }
+  recipe.ingredients.forEach(ingredient=>addRow(ingredient));
+  add.addEventListener('click',()=>addRow({item:'',qty:null},true));
+  list.addEventListener('click',event=>{
+    const button=event.target.closest('.recipe-remove-ingredient');
+    if(button)button.closest('.recipe-edit-row').remove();
+  });
+}
+
 function orderModal(order){
  // Eine Bestellung kann mehrere, unabhängig berechenbare Schmiedeprodukte enthalten.
  const selectedProducts=[];
@@ -592,7 +665,7 @@ function bind(){
  'new-calc':()=>lineModal(null,null,true),'remove-calc':()=>{calcLines.splice(Number(id),1);render();},'reset-calculator':()=>{calcLines=[];render();},
  'new-contact':()=>contactModal(),'edit-contact':()=>contactModal(state.contacts.find(c=>c.id===id)),
  'price-tab':()=>{priceTab=id;render();},'edit-price':()=>{const target=priceTab==='product'?'prices':'rawPrices';modal('Preis für '+esc(k),field('Preis pro Stück ($)','price',state[target][k]??'','number','min="0" step="any"')+'<p class="form-hint span2">Leer = Preis fehlt. 0 = kostenlos. Produktpreise gelten für alle aktuellen Bestellungen.</p>',f=>{state[target][k]=nval(f,'price',true);});},
- 'edit-recipe':()=>{const r=state.recipes[k];modal('Rezept: '+esc(k),field('Stück je Herstellung','yield',r.yield,'number','min="0.001" step="any" required')+'<p class="form-hint span2">Zutatenmengen gelten für einen Rezeptdurchgang. Bei einer fehlenden Menge bleibt das Feld leer.</p>'+r.ingredients.map((i,index)=>field(esc(i.item),'ing-'+index,i.qty??'','number','min="0" step="any"')).join(''),f=>{const y=nval(f,'yield');if(y<=0)throw new Error('Die Ausgabemenge muss größer als 0 sein.');state.recipes[k].yield=y;state.recipes[k].ingredients.forEach((i,j)=>i.qty=nval(f,'ing-'+j,true));});},
+ 'edit-recipe':()=>editRecipeModal(k),
  'export':backup,'export-csv':()=>{const curr=stock(state),rows=[['Artikel','Bestand','Notiz'],...items().map(k=>[k,curr[k],state.inventory[k].note])];download('Moo_Schmiede_Lager_'+today()+'.csv','\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(';')).join('\r\n'),'text/csv;charset=utf-8');}
  };try{actions[action]?.();}catch(e){toast(e.message,true);}});
  document.querySelectorAll('.finish').forEach(input=>input.onchange=()=>{const line=allLines().find(l=>l.id===input.dataset.line);mutate(()=>complete(state,line,input.checked),input.checked?'Fertiggestellt – Lagerabzug gebucht':'Wieder geöffnet – Lagerabzug zurückgenommen');});
