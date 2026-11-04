@@ -135,6 +135,9 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .recipe-edit-row select,.recipe-edit-row input{width:100%;min-width:0}
 .recipe-edit-row button{min-height:39px}
 @media(max-width:600px){.recipe-edit-box{padding:10px}.recipe-edit-row{grid-template-columns:minmax(0,1fr) minmax(85px,.65fr)}.recipe-edit-row .recipe-remove-ingredient{grid-column:1/-1;justify-self:end}}
+
+.order-delete-action{color:#e7a2a2!important;font-weight:600}
+.order-delete-action:hover,.order-delete-action:focus-visible{color:#ffd1cc!important;text-decoration:underline}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -410,9 +413,23 @@ function dashboard(){
  `<div class="two-col office-bottom"><section class="panel">${heading('Offene Bestellungen','Die nächsten Aufträge',button('Alle Bestellungen '+icon('arrow'),'nav-orders','link'))}${active.length?active.map(o=>`<button class="order-preview" data-action="open-order" data-id="${o.id}"><span class="mini-icon">${icon('orders')}</span><span><b>${esc(o.title)}</b><small>${esc(o.customer)}</small></span><strong>${money(orderTotal(state,o))}</strong>${icon('arrow')}</button>`).join(''):empty('Keine offenen Aufträge','Alle Bestellungen sind erledigt.')}</section><section class="panel">${heading('Fehlende Rohstoffe','Für alle offenen Bestellungen',button('Herstellungsplan '+icon('arrow'),'nav-manufacture','link'))}${Object.keys(need.buy).length?Object.entries(need.buy).map(([k,n])=>`<div class="material-line"><span>${esc(k)}<small>Im Lager: ${number(current[k])}</small></span><span class="badge open">${number(n)} fehlen</span></div>`).join(''):empty('Alles vorhanden','Das Lager deckt den offenen Bedarf.')}</section></div>`;
 }
 function getOrderStatus(o){const lines=o.lines.filter(l=>l.qty>0&&l.status!=='cancel');return !lines.length?'empty':lines.every(l=>l.done)?'done':lines.some(l=>l.status==='work'&&!l.done)?'work':'open';}
+function deleteOrderById(orderId){
+ const target=state.orders.find(order=>order.id===orderId);
+ if(!target){toast('Diese Bestellung wurde nicht gefunden.',true);return;}
+ // Abgeschlossene Bestellungen haben Lagerabzüge ausgelöst.
+ if(target.lines.some(line=>line.done)){
+   toast('Bitte zuerst alle Fertig-Haken entfernen. Fertige Bestellungen sollten als Verlauf erhalten bleiben.',true);
+   return;
+ }
+ if(!confirm('Bestellung „'+target.title+'“ wirklich dauerhaft löschen?'))return;
+ mutate(()=>{
+   state.orders=state.orders.filter(order=>order.id!==orderId);
+   if(selectedOrder===orderId)selectedOrder=null;
+ },'Bestellung gelöscht');
+}
 function orderOverview(){
  const list=state.orders.filter(o=>matches(o.title,o.customer,o.telegram,o.number)&&(overviewFilter==='all'||getOrderStatus(o)===overviewFilter));
- return heading('Bestellübersicht','Alle Kunden, Bestellungen und Fertigungsstände aus deiner Tabelle.',button('CSV exportieren','export-orders','secondary')+button(icon('plus')+' Bestellung hinzufügen','new-order'))+`<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um mehrere Produkte einzutragen und einzeln als fertig abzuhaken.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${esc(o.telegram||'—')}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span></td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
+ return heading('Bestellübersicht','Alle Kunden, Bestellungen und Fertigungsstände aus deiner Tabelle.',button('CSV exportieren','export-orders','secondary')+button(icon('plus')+' Bestellung hinzufügen','new-order'))+`<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um mehrere Produkte einzutragen und einzeln als fertig abzuhaken.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${esc(o.telegram||'—')}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span></td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}${button('Löschen','delete-order-row','text order-delete-action',`data-id="${o.id}"`)}}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
 }
 function ordersView(){
  const order=state.orders.find(o=>o.id===selectedOrder);
@@ -669,7 +686,7 @@ function bind(){
  'remove-shopping-note':()=>mutate(()=>{state.shoppingNotes=state.shoppingNotes.filter(n=>n.id!==id);},'Notiz gelöscht'),
  'new-order':()=>orderModal(), 'edit-order':()=>orderModal(o),'open-order':()=>{selectedOrder=id;if(view!=='orders')go('orders');else render();},
  'duplicate-order':()=>mutate(()=>{const copy=clone(o);copy.id=uid();copy.title+=' – Kopie';copy.lines=copy.lines.map(l=>({...l,id:uid(),done:false,status:'open',booking:{}}));state.orders.push(copy);selectedOrder=copy.id;},'Bestellung kopiert – alle Positionen sind offen'),
- 'delete-order':()=>{if(o.lines.some(l=>l.done))return toast('Bitte erst alle Fertig-Haken entfernen. Erledigte Bestellungen bitte als Verlauf behalten.',true);if(confirm('Diese Bestellung wirklich löschen?'))mutate(()=>{state.orders=state.orders.filter(x=>x.id!==o.id);selectedOrder=null;},'Bestellung gelöscht');},
+ 'delete-order':()=>deleteOrderById(o?.id), 'delete-order-row':()=>deleteOrderById(id),
  'new-line':()=>lineModal(o),'edit-line':()=>lineModal(o,o.lines.find(l=>l.id===id)), 'order-filter':()=>{orderFilter=id;render();},
  'inventory-filter':()=>{inventoryFilter=id;render();},'new-purchase':()=>purchaseModal(),'edit-purchase':()=>purchaseModal(state.purchases.find(p=>p.id===id)),
  'adjust-stock':()=>{const now=stock(state)[k]||0;modal('Bestand korrigieren',`<p class="span2"><b>${esc(k)}</b> · Aktueller Bestand: ${number(now)}</p>`+field('Tatsächlich gezählter Bestand','count',now,'number','min="0" step="any" required')+field('Grund','reason','','text','required placeholder="z. B. Inventur / gesammelte Erze"')+textarea('Artikelnotiz','note',state.inventory[k].note),f=>{const desired=nval(f,'count');state.adjustments.push({id:uid(),date:today(),item:k,qty:desired-(stock(state)[k]||0),note:f.get('reason')});state.inventory[k].note=f.get('note');});},
