@@ -168,6 +168,46 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
   text-align:center!important;
   font-variant-numeric:tabular-nums;
 }
+
+/* "Noch herstellen" innerhalb der geöffneten Bestellung */
+.order-detail-actions-row{
+ display:grid;
+ grid-template-columns:max-content minmax(275px,1fr) max-content;
+ align-items:end;
+ gap:18px;
+ margin-top:20px;
+}
+.order-detail-buttons{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.order-detail-add{justify-self:end}
+.order-needed-card{
+ min-width:0;
+ background:#171715;
+ border:1px solid #494135;
+ border-radius:12px;
+ padding:14px 16px 12px;
+ align-self:stretch;
+ color:var(--ink);
+}
+.order-needed-header h3{font:700 19px Georgia,serif;margin:0 0 5px;color:#efdfc1}
+.order-needed-header p{font-size:11px;color:var(--muted);margin:0}
+.order-needed-card .table-wrap{max-height:175px;overflow:auto;margin-top:12px}
+.order-needed-card .table-wrap th{font-size:10px;padding:9px 7px}
+.order-needed-card .table-wrap td{font-size:11px;padding:9px 7px}
+.order-needed-card .table-wrap td b{font-weight:600}
+.order-needed-empty{font-size:12px;color:var(--muted);margin:14px 0 4px}
+.order-needed-warning{font-size:11px;color:#efad9d;margin:8px 0 0}
+@media(max-width:1240px){
+ .order-detail-actions-row{grid-template-columns:minmax(0,1fr) auto;align-items:start}
+ .order-needed-card{grid-column:1/-1;grid-row:2}
+ .order-detail-add{grid-column:2;grid-row:1}
+}
+@media(max-width:600px){
+ .order-detail-actions-row{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+ .order-detail-buttons{gap:8px}
+ .order-detail-add{justify-self:auto}
+ .order-detail-add button{width:100%}
+ .order-needed-card{width:100%}
+}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -469,12 +509,21 @@ function orderOverview(){
  const list=state.orders.filter(o=>matches(o.title,o.customer,o.telegram,o.number)&&(overviewFilter==='all'||getOrderStatus(o)===overviewFilter));
  return heading('Bestellübersicht','Alle Kunden, Bestellungen und Fertigungsstände aus deiner Tabelle.',button('CSV exportieren','export-orders','secondary')+button(icon('plus')+' Bestellung hinzufügen','new-order'))+`<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um mehrere Produkte einzutragen und einzeln als fertig abzuhaken.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr class="order-row-clickable" data-order-id="${esc(o.id)}" tabindex="0" aria-label="Bestellung ${esc(o.title)} öffnen"><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${esc(o.telegram||'—')}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span></td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}${button('Löschen','delete-order-row','text order-delete-action',`data-id="${o.id}"`)}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
 }
+function orderManufacturingPanel(order){
+ const needs=plan(state,order.lines);
+ const list=Object.keys(needs.make).filter(item=>needs.make[item]>1e-9);
+ return `<section class="order-needed-card" aria-label="Noch herstellen">
+   <div class="order-needed-header"><h3>Noch herstellen</h3><p>Benötigte End- und Zwischenprodukte für diese Bestellung.</p></div>
+   ${list.length?requirementTable(needs.make):'<p class="order-needed-empty">Für diese Bestellung ist aktuell nichts mehr herzustellen.</p>'}
+   ${needs.errors.length?'<p class="order-needed-warning">'+needs.errors.map(esc).join(' · ')+'</p>':''}
+ </section>`;
+}
 function ordersView(){
  const order=state.orders.find(o=>o.id===selectedOrder);
  if(!order)return orderOverview();
  const cards=state.orders.filter(o=>matches(o.title,o.customer,o.telegram)).map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length;return `<button class="order-card ${o.id===selectedOrder?'selected':''}" data-action="open-order" data-id="${o.id}"><span>${esc(o.title)}<small>${esc(o.customer||'Kunde noch offen')}</small></span><span class="badge ${active.length&&done===active.length?'done':'open'}">${done} / ${active.length}</span></button>`}).join('');
  let detail=empty('Eine Bestellung auswählen','Links findest du die Kundenaufträge. Pro Bestellung kannst du mehrere Produkte eintragen.');
- if(order){const lines=order.lines.filter(l=>(orderFilter==='all'||orderFilter==='open'&&!l.done&&l.status!=='cancel'||orderFilter==='done'&&l.done)&&matches(l.product,l.note));detail=`<div class="order-detail-top"><div class="eyebrow">KUNDENBESTELLUNG · ${order.lines.length} POSITIONEN</div><div class="section-head"><div><h2>${esc(order.title)}</h2><p>${esc(order.customer||'Kein Kunde')} <span class="dot">·</span> Telegramm ${esc(order.telegram||'—')}</p></div><div class="total"><small>Bestellwert</small><b>${money(orderTotal(state,order))}</b></div></div><div class="actions">${button('Bestellung bearbeiten','edit-order','secondary')}${button('Duplizieren','duplicate-order','secondary')}${button('Löschen','delete-order','danger')}<div class="push"></div>${button(icon('plus')+' Produkt hinzufügen','new-line')}</div>${order.notes?`<p class="note">${esc(order.notes)}</p>`:''}</div><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['done','Fertig']].map(([v,t])=>`<button data-action="order-filter" data-id="${v}" class="${orderFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">Fertig-Haken buchen den Lagerabzug.</small></div>${lines.length?table(['Fertig','Produkt / Notiz','Anzahl','Status','Stückpreis','Summe','Lagerentnahme',''],lines.map(l=>`<tr class="status-row ${l.qty>0?(l.done?'done':l.status):'zero'}"><td><input type="checkbox" class="finish" aria-label="${esc(l.product)} fertigstellen" data-line="${l.id}" ${l.done?'checked':''} ${l.status==='cancel'?'disabled':''}></td><td><b>${esc(l.product)}</b>${l.note?`<small>${esc(l.note)}</small>`:''}</td><td class="num">${number(l.qty)}</td><td>${badge(l)}</td><td class="num">${money(state.prices[l.product])}</td><td class="num">${money(lineTotal(state,l))}</td><td><small>${({stock:'Endprodukt aus Lager',parts:'Direkte Bauteile',raw:'Aus Rohstoffen'})[l.mode]}</small></td><td>${button('Bearbeiten','edit-line','text',`data-id="${l.id}"`)}</td></tr>`)) :empty('Noch keine Positionen','Füge die gewünschten Endprodukte und Mengen hinzu.')}`;}
+ if(order){const lines=order.lines.filter(l=>(orderFilter==='all'||orderFilter==='open'&&!l.done&&l.status!=='cancel'||orderFilter==='done'&&l.done)&&matches(l.product,l.note));detail=`<div class="order-detail-top"><div class="eyebrow">KUNDENBESTELLUNG · ${order.lines.length} POSITIONEN</div><div class="section-head"><div><h2>${esc(order.title)}</h2><p>${esc(order.customer||'Kein Kunde')} <span class="dot">·</span> Telegramm ${esc(order.telegram||'—')}</p></div><div class="total"><small>Bestellwert</small><b>${money(orderTotal(state,order))}</b></div></div><div class="order-detail-actions-row"><div class="order-detail-buttons">${button('Bestellung bearbeiten','edit-order','secondary')}${button('Duplizieren','duplicate-order','secondary')}${button('Löschen','delete-order','danger')}</div>${orderManufacturingPanel(order)}<div class="order-detail-add">${button(icon('plus')+' Produkt hinzufügen','new-line')}</div></div>${order.notes?`<p class="note">${esc(order.notes)}</p>`:''}</div><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['done','Fertig']].map(([v,t])=>`<button data-action="order-filter" data-id="${v}" class="${orderFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">Fertig-Haken buchen den Lagerabzug.</small></div>${lines.length?table(['Fertig','Produkt / Notiz','Anzahl','Status','Stückpreis','Summe','Lagerentnahme',''],lines.map(l=>`<tr class="status-row ${l.qty>0?(l.done?'done':l.status):'zero'}"><td><input type="checkbox" class="finish" aria-label="${esc(l.product)} fertigstellen" data-line="${l.id}" ${l.done?'checked':''} ${l.status==='cancel'?'disabled':''}></td><td><b>${esc(l.product)}</b>${l.note?`<small>${esc(l.note)}</small>`:''}</td><td class="num">${number(l.qty)}</td><td>${badge(l)}</td><td class="num">${money(state.prices[l.product])}</td><td class="num">${money(lineTotal(state,l))}</td><td><small>${({stock:'Endprodukt aus Lager',parts:'Direkte Bauteile',raw:'Aus Rohstoffen'})[l.mode]}</small></td><td>${button('Bearbeiten','edit-line','text',`data-id="${l.id}"`)}</td></tr>`)) :empty('Noch keine Positionen','Füge die gewünschten Endprodukte und Mengen hinzu.')}`;}
  return heading('Bestellung bearbeiten','Mehrere Produkte für einen Kunden.',button('← Zur Bestellübersicht','back-orders','secondary'))+`<section class="panel order-detail">${detail}</section>`;
 }
 function inventoryView(){const current=stock(state),need=plan(state,openLines());const list=items().filter(k=>matches(k,state.inventory[k].note)&&(inventoryFilter==='all'||inventoryFilter==='raw'&&!state.recipes[k]||inventoryFilter==='product'&&state.recipes[k]||inventoryFilter==='short'&&(need.buy[k]||need.make[k]||current[k]<0)));return heading('Lagerbestand','Einkäufe und fertige Bestellungen werden automatisch verrechnet.',button(icon('plus')+' Einkauf erfassen','new-purchase'))+`<div class="stats compact">${summary('Artikel im Lager',items().filter(k=>current[k]>0).length,'Mit positivem Bestand','inventory')}${summary('Fehlende Rohstoffe',Object.keys(need.buy).length,'Für offene Bestellungen','orders')}${summary('Zu fertigende Produkte',Object.keys(need.make).length,'Lagerbestand bereits berücksichtigt','manufacture')}</div><div class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle Artikel'],['raw','Rohstoffe'],['product','Produkte'],['short','Fehlmengen']].map(([v,t])=>`<button class="${inventoryFilter===v?'active':''}" data-action="inventory-filter" data-id="${v}">${t}</button>`).join('')}</div><small class="muted">${list.length} Artikel</small></div>${list.length?table(['Artikel','Art','Lagerbestand','Offener Bedarf','Noch benötigt','Notiz',''],list.map(k=>`<tr><td><b>${esc(k)}</b></td><td><span class="tag">${state.recipes[k]?'Produkt / Bauteil':'Rohstoff'}</span></td><td class="num ${current[k]<0?'negative':''}"><b>${number(current[k])}</b></td><td class="num">${number(need.demand[k])}</td><td class="num">${(need.buy[k]||need.make[k])?`<span class="badge open">${number(need.buy[k]||need.make[k])} ${state.recipes[k]?'herstellen':'beschaffen'}</span>`:'<span class="muted">—</span>'}</td><td>${esc(state.inventory[k].note)}</td><td>${button('Bestand korrigieren','adjust-stock','text',`data-item="${esc(k)}"`)}</td></tr>`)):empty('Keine Artikel gefunden','Passe Suche oder Filter an.')}</div><p class="footnote">Bestandskorrekturen erfassen einen einmaligen Zu- oder Abgang. Einkäufe bitte im Einkaufsbuch eintragen.</p>`;}
