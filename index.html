@@ -161,6 +161,9 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
   padding-right:10px;
   font-variant-numeric:tabular-nums;
 }
+
+/* Tabellenüberschriften an die Zahlenwerte jeder Spalte anpassen */
+.table-wrap thead th.num{text-align:right;font-variant-numeric:tabular-nums}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -405,7 +408,7 @@ function button(label,action,kind='primary',extra=''){return `<button class="${k
 function empty(title,text,action=''){return `<div class="empty">${icon('inventory')}<h3>${title}</h3><p>${text}</p>${action}</div>`;}
 function heading(title,sub,actions=''){return `<div class="section-head"><div><h2>${title}</h2><p>${sub}</p></div><div class="actions">${actions}</div></div>`;}
 function summary(label,value,sub,ico){return `<article class="stat"><span class="stat-icon">${icon(ico)}</span><div class="muted">${label}</div><strong>${value}</strong><small>${sub}</small></article>`;}
-function table(headers,rows,classes=''){return `<div class="table-wrap"><table class="${classes}"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;}
+function table(headers,rows,classes=''){const numericColumns=[...(rows[0]||'').matchAll(/<td\b[^>]*>/gi)].map(match=>/\bclass\s*=\s*(?:"[^"]*\bnum\b[^"]*"|'[^']*\bnum\b[^']*')/.test(match[0]));return `<div class="table-wrap"><table class="${classes}"><thead><tr>${headers.map((h,index)=>`<th class="${numericColumns[index]?'num':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;}
 function hero(){return `<section class="hero office-hero office-hero-with-note"><div class="office-hero-intro"><div class="eyebrow">WHISPER · REDM SCHMIEDEVERWALTUNG</div><h2>Die Schmiede im Überblick.</h2><p>Alle Daten deiner Schmiede an einem Ort – von Bestellungen und Kunden<br>über Lager und Einkäufe bis zu Rezepten und Herstellung.</p><div class="actions">${button(icon('orders')+' Bestellungen ansehen','nav-orders')}${button(icon('plus')+' Bestellung hinzufügen','new-order','secondary')}</div></div>${shoppingNotePanel()}</section>`;}
 function shoppingNotePanel(){
  const notes=Array.isArray(state.shoppingNotes)?state.shoppingNotes:[];
