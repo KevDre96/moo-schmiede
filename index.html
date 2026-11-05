@@ -148,6 +148,19 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 /* Moo Schmiede: neues Foto im oberen Seitenleistenbereich */
 .brand:has(.moo-sidebar-portrait){min-height:255px;padding:20px 28px 24px;gap:15px}
 .brand img.moo-sidebar-portrait{display:block;width:190px;height:155px;object-fit:cover;object-position:center;border-radius:9px;border:1px solid #775c343d;box-shadow:0 6px 28px #0007}
+
+/* Bestellpositionen: Spaltenköpfe bündig mit Anzahl und Geldbeträgen */
+.order-detail .table-wrap th:nth-child(3),
+.order-detail .table-wrap th:nth-child(5),
+.order-detail .table-wrap th:nth-child(6),
+.order-detail .table-wrap td:nth-child(3),
+.order-detail .table-wrap td:nth-child(5),
+.order-detail .table-wrap td:nth-child(6){
+  text-align:right;
+  padding-left:10px;
+  padding-right:10px;
+  font-variant-numeric:tabular-nums;
+}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
