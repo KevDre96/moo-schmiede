@@ -156,14 +156,18 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .order-detail .table-wrap td:nth-child(3),
 .order-detail .table-wrap td:nth-child(5),
 .order-detail .table-wrap td:nth-child(6){
-  text-align:right;
+  text-align:center;
   padding-left:10px;
   padding-right:10px;
   font-variant-numeric:tabular-nums;
 }
 
-/* Tabellenüberschriften an die Zahlenwerte jeder Spalte anpassen */
-.table-wrap thead th.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Zahlenspalten: Text in Überschrift UND Wert mittig in derselben Spalte */
+.table-wrap table thead th.num,
+.table-wrap table tbody td.num{
+  text-align:center!important;
+  font-variant-numeric:tabular-nums;
+}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
