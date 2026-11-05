@@ -422,13 +422,21 @@ function getOrderStatus(o){const lines=o.lines.filter(l=>l.qty>0&&l.status!=='ca
 function deleteOrderById(orderId){
  const target=state.orders.find(order=>order.id===orderId);
  if(!target){toast('Diese Bestellung wurde nicht gefunden.',true);return;}
- // Abgeschlossene Bestellungen haben Lagerabzüge ausgelöst.
- if(target.lines.some(line=>line.done)){
-   toast('Bitte zuerst alle Fertig-Haken entfernen. Fertige Bestellungen sollten als Verlauf erhalten bleiben.',true);
-   return;
- }
- if(!confirm('Bestellung „'+target.title+'“ wirklich dauerhaft löschen?'))return;
+ const hasFinished=target.lines.some(line=>line.done);
+ const notice=hasFinished?'\n\nBereits abgebuchte Materialien bleiben im Lager als Bestandskorrektur berücksichtigt.':'';
+ if(!confirm('Bestellung „'+target.title+'“ wirklich dauerhaft löschen?'+notice))return;
  mutate(()=>{
+   // Verbrauchte Rohstoffe nach dem Entfernen der Bestellung weiterhin abbuchen.
+   const booked={};
+   for(const line of target.lines){
+     if(!line.done)continue;
+     for(const [item,qty] of Object.entries(line.booking||{})){
+       if(qty>0)booked[item]=(booked[item]||0)+qty;
+     }
+   }
+   for(const [item,qty] of Object.entries(booked)){
+     state.adjustments.push({id:uid(),date:today(),item,qty:-qty,note:'Lagerabzug: gelöschte Bestellung „'+target.title+'“'});
+   }
    state.orders=state.orders.filter(order=>order.id!==orderId);
    if(selectedOrder===orderId)selectedOrder=null;
  },'Bestellung gelöscht');
