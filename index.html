@@ -267,7 +267,7 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .order-batch-materials{display:flex;flex-wrap:wrap;gap:5px;width:100%;margin-top:2px}
 .order-batch-material{display:inline-flex;background:#29251d;border:1px solid #645437;border-radius:5px;padding:4px 6px;font-weight:600;color:#f0dcb2;font-size:11px}
 .order-batch-overflow{display:block;margin-top:7px;color:#f1bb8b;font-size:10px}
-@media(max-width:600px){.order-batch-plan{padding:9px}.order-batch-summary{gap:4px 8px}}
+@media(max-width:600px){.order-batch-plan{padding:9px}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -574,19 +574,14 @@ function orderOverview(){
 // Bedarfsplanung bleibt unverändert anteilig.
 function orderCraftBatches(item,amount,recipe){
  if(!recipe||!(recipe.yield>0))return '';
- const crafts=Math.max(0,Math.ceil(amount/recipe.yield-1e-9));
- if(!crafts)return '';
- const full=Math.floor(crafts/100),rest=crafts%100;
- const produced=crafts*recipe.yield;
- const materials=perBatch=>recipe.ingredients.length?
-   recipe.ingredients.map(i=>`<span class="order-batch-material">${typeof i.qty==='number'?number(i.qty*perBatch):'?'} × ${esc(i.item)}</span>`).join(''):
+ // Zeige nur EINEN möglichen Arbeitsgang, nie mehrere oder Restlisten.
+ const totalCrafts=Math.max(0,Math.ceil(amount/recipe.yield-1e-9));
+ if(!totalCrafts)return '';
+ const craftsThisBatch=Math.min(100,totalCrafts);
+ const materials=recipe.ingredients.length?
+   recipe.ingredients.map(i=>`<span class="order-batch-material">${typeof i.qty==='number'?number(i.qty*craftsThisBatch):'?'} × ${esc(i.item)}</span>`).join(''):
    '<span class="muted">Keine Zutaten hinterlegt</span>';
- const batch=(label,craftCount)=>`<div class="order-batch-row"><strong>${label}</strong><span>${number(craftCount)}× herstellen → ${number(craftCount*recipe.yield)} Stück</span><div class="order-batch-materials">${materials(craftCount)}</div></div>`;
- const fullLabel=full===1?'Arbeitsgang 1':`Arbeitsgänge 1–${number(full)} (je Arbeitsgang)`;
- return `<div class="order-batch-plan">
- ${full?batch(fullLabel,100):''}${rest?batch(`Arbeitsgang ${number(full+1)}`,rest):''}
- ${produced>amount+1e-7?`<small class="order-batch-overflow">${number(produced-amount)} Stück Mehrproduktion durch ganze Rezeptdurchgänge.</small>`:''}
- </div>`;
+ return `<div class="order-batch-plan"><div class="order-batch-row"><strong>1 Arbeitsgang · ${number(craftsThisBatch)}× herstellen</strong><span>→ ${number(craftsThisBatch*recipe.yield)} Stück</span><div class="order-batch-materials">${materials}</div></div></div>`;
 }
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
@@ -598,10 +593,10 @@ function orderManufacturingPanel(order){
    const ingredients=recipe?.ingredients||[];
    rows.push(`<tr class="order-needed-product-row"><td><b>${esc(item)}</b></td><td class="num gold"><b>${number(amount)}</b></td><td class="num">${number(current[item]||0)}</td></tr>`);
    const details=ingredients.length?ingredients.map(ing=>{
-     const needed=typeof ing.qty==='number'&&recipe.yield>0?number(amount/recipe.yield*ing.qty):'?';
+     const needed=typeof ing.qty==='number'&&recipe.yield>0?number(Math.ceil(amount/recipe.yield-1e-9)*ing.qty):'?';
      return `<span class="order-needed-material ${needed==='?'?'order-needed-material-unknown':''}">${needed} × ${esc(ing.item)}</span>`;
    }).join(''):'<span class="muted">Keine Zutaten hinterlegt</span>';
-   rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Zutaten für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div>${orderCraftBatches(item,amount,recipe)}</td></tr>`);
+   rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Gesamtbedarf für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div>${orderCraftBatches(item,amount,recipe)}</td></tr>`);
  }
  return `<section class="order-needed-card" aria-label="Noch herstellen">
    <div class="order-needed-header"><h3>Noch herstellen</h3><p>Benötigte End- und Zwischenprodukte für diese Bestellung.</p></div>
