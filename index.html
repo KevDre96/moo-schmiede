@@ -581,7 +581,7 @@ function orderCraftBatches(item,amount,recipe){
  const materials=recipe.ingredients.length?
    recipe.ingredients.map(i=>`<span class="order-batch-material">${typeof i.qty==='number'?number(i.qty*craftsThisBatch):'?'} × ${esc(i.item)}</span>`).join(''):
    '<span class="muted">Keine Zutaten hinterlegt</span>';
- return `<div class="order-batch-plan"><div class="order-batch-row"><strong>1 Arbeitsgang · ${number(craftsThisBatch)}× herstellen</strong><span>→ ${number(craftsThisBatch*recipe.yield)} Stück</span><div class="order-batch-materials">${materials}</div></div></div>`;
+ return `<div class="order-batch-plan"><div class="order-batch-row"><strong>Arbeitsgang 1 · ${number(craftsThisBatch)}× herstellen</strong><span>→ ${number(craftsThisBatch*recipe.yield)} Stück</span><div class="order-batch-materials">${materials}</div></div></div>`;
 }
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
