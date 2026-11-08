@@ -268,6 +268,13 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .order-batch-material{display:inline-flex;background:#29251d;border:1px solid #645437;border-radius:5px;padding:4px 6px;font-weight:600;color:#f0dcb2;font-size:11px}
 .order-batch-overflow{display:block;margin-top:7px;color:#f1bb8b;font-size:10px}
 @media(max-width:600px){.order-batch-plan{padding:9px}}
+
+/* Freiwillig: Kontakt erst auf ausdrücklichen Klick ins Adressbuch speichern */
+.order-address-save{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin:-1px 0 5px}
+.order-address-save button{font-weight:700;min-height:39px}
+.order-address-save small{font-size:11px;color:#bcae91;line-height:1.5}
+.order-address-save small.error{color:#e9a39d}
+@media(max-width:620px){.order-address-save{align-items:stretch;flex-direction:column}.order-address-save button{width:100%}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -706,6 +713,7 @@ function orderModal(order){
  const form=field('Name der Bestellung','title',order?.title||'','text','required placeholder="z. B. Büchsenmacher Blackwater"')+
  `<div class="field order-contact-field"><label for="order-customer-input">Kunde / Gewerbe</label><input id="order-customer-input" name="customer" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="order-contact-suggestions" aria-expanded="false" placeholder="Name aus dem Adressbuch eingeben" value="${esc(order?.customer||'')}" required><div class="order-contact-suggestions" id="order-contact-suggestions" role="listbox" aria-label="Passende Adressbuch-Kontakte" hidden></div></div>`+
  field('Telegrammnummer','telegram',order?.telegram||'')+
+ '<div class="order-address-save span2"><button type="button" class="secondary" id="order-save-contact">Im Adressbuch speichern</button><small id="order-save-contact-status" role="status" aria-live="polite">Nur bei Klick speichern. Der Bestellungsname wird als Gewerbe/Notiz übernommen.</small></div>'+ 
  '<div class="picker-intro">Wähle unten deine Schmiedeprodukte aus.</div>'+picker+
  textarea('Notizen zur Bestellung','notes',order?.notes||'');
  modal(order?'Bestellung bearbeiten':'Neue Bestellung',form,f=>{
@@ -716,17 +724,7 @@ function orderModal(order){
    const additions=selectedProducts.map(l=>({id:uid(),product:l.product,qty:l.qty,status:'open',mode:'raw',note:'',done:false,booking:{}}));
    if(order){const current=state.orders.find(o=>o.id===order.id);Object.assign(current,values);current.lines.push(...additions);}
    else{const created={id:uid(),...values,number:'',lines:additions};state.orders.push(created);selectedOrder=created.id;view='orders';location.hash='orders';}
-   // Bestellkunden mit Telegrammnummer beim Speichern im Adressbuch ergänzen.
-   // Gleichnamige Kontakte anhand ihrer Nummer unterscheiden.
-   const cleanName=name=>String(name||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('de-DE');
-   const cleanTelegram=number=>String(number||'').trim().replace(/[\s-]+/g,'').toLocaleUpperCase('de-DE');
-   const enteredName=cleanName(values.customer);
-   const enteredTelegram=cleanTelegram(values.telegram);
-   const alreadySaved=state.contacts.some(c=>
-     cleanName(c.name)===enteredName &&
-     (!enteredTelegram || cleanTelegram(c.telegram)===enteredTelegram)
-   );
-   if(!alreadySaved)state.contacts.push({id:uid(),name:values.customer,telegram:values.telegram,note:''});
+
  });
  const dialog=$('#dialog');dialog.classList.add('order-dialog');
  const list=dialog.querySelector('#order-product-catalog');
@@ -774,6 +772,47 @@ function orderModal(order){
  const telegramInput=dialog.querySelector('[name=telegram]');
  const contactList=dialog.querySelector('#order-contact-suggestions');
  const normalizeContact=v=>String(v||'').trim().toLocaleLowerCase('de-DE');
+ const contactSaveButton=dialog.querySelector('#order-save-contact');
+ const contactSaveStatus=dialog.querySelector('#order-save-contact-status');
+ const orderTitleInput=dialog.querySelector('[name=title]');
+ function contactSaveMessage(message,error=false){
+   contactSaveStatus.textContent=message;
+   contactSaveStatus.classList.toggle('error',error);
+ }
+ [customerInput,telegramInput,orderTitleInput].forEach(input=>input.addEventListener('input',()=>{
+   contactSaveMessage('Nur bei Klick speichern. Der Bestellungsname wird als Gewerbe/Notiz übernommen.');
+ }));
+ contactSaveButton.addEventListener('click',()=>{
+   const customer=customerInput.value.trim().replace(/\s+/g,' ');
+   const telegram=telegramInput.value.trim();
+   const business=orderTitleInput.value.trim();
+   if(!customer||!telegram||!business){
+     contactSaveMessage('Bitte zuerst Bestellungsname/Gewerbe, Kunde und Telegrammnummer eingeben.',true);
+     return;
+   }
+   if(cloud.role==='viewer'){
+     contactSaveMessage('Keine Schreibrechte für das Adressbuch.',true);
+     return;
+   }
+   const normalizedName=customer.toLocaleLowerCase('de-DE');
+   const normalizedTelegram=telegram.replace(/[\s-]+/g,'').toLocaleUpperCase('de-DE');
+   const exists=state.contacts.some(c=>String(c.name||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('de-DE')===normalizedName &&
+     String(c.telegram||'').trim().replace(/[\s-]+/g,'').toLocaleUpperCase('de-DE')===normalizedTelegram);
+   if(exists){
+     contactSaveMessage('Dieser Kontakt ist bereits im Adressbuch vorhanden.');
+     return;
+   }
+   const previous=clone(state);
+   try{
+     state.contacts.push({id:uid(),name:customer,telegram,note:business});
+     persist('Kontakt ins Adressbuch übernommen');
+     contactSaveMessage('Kontakt hinzugefügt – wird online gespeichert.');
+   }catch(error){
+     state=previous;
+     contactSaveMessage('Speichern fehlgeschlagen: '+error.message,true);
+   }
+ });
+
  let matchesContacts=[],activeContact=-1;
  function hideContactList(){
    contactList.hidden=true;contactList.innerHTML='';
