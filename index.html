@@ -317,6 +317,31 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
  .dashboard-header .header-actions .moo-logout{order:-1;margin-left:auto}
  .dashboard-header .quick-search-wrap{flex:1 1 100%}
 }
+
+/* Taschenrechner auf dem Dashboard, ohne Einfluss auf Cloud-Daten */
+.dashboard-calculator{margin-top:19px;max-width:525px;padding:16px;border:1px solid #715a32;border-radius:12px;background:linear-gradient(145deg,#242019,#161615);box-shadow:0 10px 25px #0002;min-width:0}
+.dashboard-calc-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.dashboard-calc-top strong{font:700 18px Georgia,serif;color:#f0dfb9}
+.dashboard-calc-top small{font-size:10px;color:#aa9b81}
+.dashboard-calc-input{display:block;width:100%;margin-bottom:5px;background:#10100f;border:1px solid #5d4c31;border-radius:7px;padding:10px 11px;color:#f4eee0;font:16px/1.4 system-ui,Arial,sans-serif;text-align:right;min-width:0}
+.dashboard-calc-input:focus{border-color:var(--gold);outline:2px solid #d8b56524}
+.dashboard-calc-answer{display:block;min-height:35px;text-align:right;color:#e9c678;font:700 25px/1.3 Georgia,serif;overflow-wrap:anywhere}
+.dashboard-calc-error{min-height:15px;margin:2px 0 8px;color:#eda49c;font-size:11px}
+.dashboard-calc-keys{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.dashboard-calc-key{min-width:0;min-height:42px;border:1px solid #45403a;border-radius:7px;background:#292824;color:#eee5d6;font-weight:700;font-size:14px}
+.dashboard-calc-key:hover{background:#373329;border-color:#8b7241}
+.dashboard-calc-key:focus-visible{outline:2px solid #e3bc6d;outline-offset:2px}
+.dashboard-calc-key--op{color:#efcc7b;background:#2b271e}
+.dashboard-calc-key--utility{color:#d7c39d;background:#24221e}
+.dashboard-calc-key--clear{color:#efaaa3;background:#32211f}
+.dashboard-calc-key--equals{background:var(--gold);border-color:#b9954d;color:#21190d}
+.dashboard-calc-key--equals:hover{background:#edcb82}
+.dashboard-calc-more{margin-top:9px}
+.dashboard-calc-more summary{cursor:pointer;font-size:11px;color:#d8bd83;padding:5px 0}
+.dashboard-calc-more .dashboard-calc-keys{margin-top:9px}
+.dashboard-calc-help{margin:10px 0 0!important;color:#b9ad95!important;font-size:10px!important;line-height:1.5!important}
+@media(max-width:760px){.dashboard-calculator{max-width:none;padding:12px}.dashboard-calc-key{min-height:45px;font-size:13px}.dashboard-calc-answer{font-size:23px}}
+
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -562,7 +587,7 @@ function empty(title,text,action=''){return `<div class="empty">${icon('inventor
 function heading(title,sub,actions=''){return `<div class="section-head"><div><h2>${title}</h2><p>${sub}</p></div><div class="actions">${actions}</div></div>`;}
 function summary(label,value,sub,ico){return `<article class="stat"><span class="stat-icon">${icon(ico)}</span><div class="muted">${label}</div><strong>${value}</strong><small>${sub}</small></article>`;}
 function table(headers,rows,classes=''){const numericColumns=[...(rows[0]||'').matchAll(/<td\b[^>]*>/gi)].map(match=>/\bclass\s*=\s*(?:"[^"]*\bnum\b[^"]*"|'[^']*\bnum\b[^']*')/.test(match[0]));return `<div class="table-wrap"><table class="${classes}"><thead><tr>${headers.map((h,index)=>`<th class="${numericColumns[index]?'num':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;}
-function hero(){return `<section class="hero office-hero office-hero-with-note"><div class="office-hero-intro"><div class="eyebrow">WHISPER · REDM SCHMIEDEVERWALTUNG</div><h2>Die Schmiede im Überblick.</h2><p>Alle Daten deiner Schmiede an einem Ort – von Bestellungen und Kunden<br>über Lager und Einkäufe bis zu Rezepten und Herstellung.</p></div>${shoppingNotePanel()}</section>`;}
+function hero(){return `<section class="hero office-hero office-hero-with-note"><div class="office-hero-intro"><div class="eyebrow">WHISPER · REDM SCHMIEDEVERWALTUNG</div><h2>Die Schmiede im Überblick.</h2><p>Alle Daten deiner Schmiede an einem Ort – von Bestellungen und Kunden<br>über Lager und Einkäufe bis zu Rezepten und Herstellung.</p>${dashboardCalculatorPanel()}</div>${shoppingNotePanel()}</section>`;}
 function shoppingNotePanel(){
  const notes=Array.isArray(state.shoppingNotes)?state.shoppingNotes:[];
  return `<aside class="shopping-note-embedded shopping-note-multiple" aria-labelledby="shopping-note-heading">
@@ -920,6 +945,160 @@ function purchaseModal(p){modal(p?'Einkauf bearbeiten':'Einkauf erfassen',field(
 function contactModal(c){modal(c?'Kontakt bearbeiten':'Neuer Kontakt',field('Name / Gewerbe','name',c?.name||'','text','required')+field('Telegrammnummer','telegram',c?.telegram||'')+textarea('Notizen','note',c?.note||''),f=>{const values=Object.fromEntries(f);if(c)Object.assign(state.contacts.find(x=>x.id===c.id),values);else state.contacts.push({...values,id:uid()});},c?'<button type="button" class="danger" id="delete-contact">Kontakt löschen</button>':'');if(c)$('#delete-contact').onclick=()=>{if(confirm('Kontakt löschen? Bestehende Bestellungen bleiben erhalten.')){mutate(()=>{state.contacts=state.contacts.filter(x=>x.id!==c.id);},'Kontakt gelöscht');$('#dialog').close();}};}
 function download(name,text,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function backup(){download('Moo_Schmiede_Sicherung_'+today()+'.json',JSON.stringify(state,null,2));toast('Sicherung heruntergeladen');}
+
+let dashCalcExpression='',dashCalcJustEvaluated=false;
+
+function mooCalculateExpression(source){
+ const text=String(source).replace(/\s+/g,'').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
+ if(!text)throw new Error('Bitte eine Rechnung eingeben.');
+ if(text.length>180)throw new Error('Die Rechnung ist zu lang.');
+ let pos=0;
+ const fail=()=>{throw new Error('Bitte die Rechnung prüfen.');};
+ const next=()=>text[pos];
+ function primary(){
+  if(next()==='('){pos++;const n=add();if(next()!==')')fail();pos++;return n;}
+  if(next()==='π'){pos++;return Math.PI;}
+  if(next()==='e'&&!/[0-9A-Za-z]/.test(text[pos+1]||'')){pos++;return Math.E;}
+  const func=/^(sin|cos|tan|log|ln|abs|sqrt)\(/.exec(text.slice(pos));
+  if(func){
+   pos+=func[1].length+1;
+   const n=add();
+   if(next()!==')')fail();pos++;
+   if(func[1]==='sin')return Math.sin(n*Math.PI/180);
+   if(func[1]==='cos')return Math.cos(n*Math.PI/180);
+   if(func[1]==='tan')return Math.tan(n*Math.PI/180);
+   if(func[1]==='log')return Math.log10(n);
+   if(func[1]==='ln')return Math.log(n);
+   if(func[1]==='abs')return Math.abs(n);
+   return Math.sqrt(n);
+  }
+  const numberMatch=/^(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:[eE][+-]?\d+)?/.exec(text.slice(pos));
+  if(!numberMatch)fail();
+  pos+=numberMatch[0].length;
+  const value=Number(numberMatch[0].replace(',','.'));
+  if(!Number.isFinite(value))fail();
+  return value;
+ }
+ function postfix(){
+  let value=primary();
+  while(next()==='%'||next()==='!'){
+   const op=text[pos++];
+   if(op==='%')value/=100;
+   else{
+    if(value<0||!Number.isInteger(value)||value>170)throw new Error('Fakultät nur für ganze Zahlen von 0 bis 170.');
+    let product=1;for(let n=2;n<=value;n++)product*=n;value=product;
+   }
+  }
+  return value;
+ }
+ function power(){
+  let value=postfix();
+  if(next()==='^'){pos++;value=Math.pow(value,unary());}
+  return value;
+ }
+ function unary(){
+  if(next()==='+'){pos++;return unary();}
+  if(next()==='-'){pos++;return -unary();}
+  if(next()==='√'){pos++;return Math.sqrt(unary());}
+  return power();
+ }
+ function term(){
+  let value=unary();
+  while(next()==='*'||next()==='/'){
+   const op=text[pos++],right=unary();
+   if(op==='/'&&right===0)throw new Error('Division durch 0 ist nicht möglich.');
+   value=op==='*'?value*right:value/right;
+  }
+  return value;
+ }
+ function add(){
+  let value=term();
+  while(next()==='+'||next()==='-'){
+   const op=text[pos++],rhsStart=pos;
+   let right=term();
+   // Wie beim Taschenrechner: 200 + 10 % = 220; 200 × 10 % = 20.
+   if(/^(?:\d+(?:[.,]\d*)?|[.,]\d+|\([^()]*\))%$/.test(text.slice(rhsStart,pos)))right=value*right;
+   value=op==='+'?value+right:value-right;
+  }
+  return value;
+ }
+ const result=add();
+ if(pos!==text.length)fail();
+ if(!Number.isFinite(result))throw new Error('Kein gültiges Ergebnis (z. B. Wurzel aus negativer Zahl).');
+ return Number(result.toPrecision(13));
+}
+function dashboardCalculatorPanel(){
+ const standard=[
+  ['AC','clear','clear'],['⌫','backspace','utility'],['(', '(','utility'],[')',')','utility'],['÷','÷','op'],
+  ['7','7'],['8','8'],['9','9'],['x²','^2','op'],['×','×','op'],
+  ['4','4'],['5','5'],['6','6'],['√','√(','op'],['−','−','op'],
+  ['1','1'],['2','2'],['3','3'],['xʸ','^','op'],['+','+','op'],
+  ['±','sign','utility'],['0','0'],[',',','],['%','%','op'],['=','equals','equals']
+ ];
+ const advanced=[
+  ['sin','sin(','op'],['cos','cos(','op'],['tan','tan(','op'],['log','log(','op'],['ln','ln(','op'],
+  ['π','π','utility'],['e','e','utility'],['1/x','reciprocal','utility'],['|x|','abs(','utility'],['x!','!','op']
+ ];
+ const buttons=arr=>arr.map(([label,key,kind])=>'<button type="button" class="dashboard-calc-key'+(kind?' dashboard-calc-key--'+kind:'')+'" data-calc-key="'+esc(key)+'" aria-label="'+esc(label)+'">'+esc(label)+'</button>').join('');
+ return '<section class="dashboard-calculator" aria-label="Taschenrechner">'+
+  '<div class="dashboard-calc-top"><strong>Taschenrechner</strong><small>Rechnen direkt im Dashboard</small></div>'+
+  '<input class="dashboard-calc-input" id="dashboard-calc-expression" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" aria-label="Rechnung eingeben" placeholder="z. B. 250 × 4 + 10%" value="'+esc(dashCalcExpression)+'">'+
+  '<output class="dashboard-calc-answer" id="dashboard-calc-answer" aria-live="polite">0</output>'+
+  '<div class="dashboard-calc-error" id="dashboard-calc-error" role="alert"></div>'+
+  '<div class="dashboard-calc-keys">'+buttons(standard)+'</div>'+
+  '<details class="dashboard-calc-more"><summary>Weitere Funktionen: sin, cos, log und mehr</summary><div class="dashboard-calc-keys">'+buttons(advanced)+'</div></details>'+
+  '<p class="dashboard-calc-help">Komma = Dezimalzahl · sin/cos/tan in Grad · % z. B. 200 + 10% = 220 · Enter = Ergebnis</p>'+
+  '</section>';
+}
+function bindDashboardCalculator(){
+ const input=$('#dashboard-calc-expression');
+ if(!input)return;
+ const result=$('#dashboard-calc-answer'),error=$('#dashboard-calc-error');
+ const format=n=>new Intl.NumberFormat('de-DE',{maximumFractionDigits:12}).format(n);
+ function refresh(showError=false){
+  dashCalcExpression=input.value;
+  if(!dashCalcExpression.trim()){result.textContent='0';error.textContent='';return;}
+  try{
+   const value=mooCalculateExpression(dashCalcExpression);
+   result.textContent=format(value);
+   error.textContent='';
+  }catch(e){
+   result.textContent='…';
+   error.textContent=showError?e.message:'';
+  }
+ }
+ function change(next){dashCalcExpression=next.slice(0,180);input.value=dashCalcExpression;refresh();}
+ function evaluate(){
+  try{
+   const value=mooCalculateExpression(input.value);
+   change(String(value).replace('.',','));
+   dashCalcJustEvaluated=true;
+   result.textContent=format(value);
+  }catch(e){refresh(true);}
+ }
+ input.addEventListener('input',()=>{dashCalcJustEvaluated=false;refresh();});
+ input.addEventListener('keydown',event=>{
+  if(event.key==='Enter'){event.preventDefault();evaluate();}
+  if(event.key==='Escape'){event.preventDefault();change('');}
+ });
+ document.querySelectorAll('[data-calc-key]').forEach(button=>{
+  button.addEventListener('click',()=>{
+   const key=button.dataset.calcKey;
+   const current=input.value;
+   if(key==='clear'){change('');dashCalcJustEvaluated=false;return;}
+   if(key==='equals'){evaluate();return;}
+   if(key==='backspace'){change(current.slice(0,-1));dashCalcJustEvaluated=false;return;}
+   if(key==='sign'){change(current.startsWith('−(')&&current.endsWith(')')?current.slice(2,-1):'−('+(current||'0')+')');dashCalcJustEvaluated=false;return;}
+   if(key==='reciprocal'){change('1/('+(current||'1')+')');dashCalcJustEvaluated=false;return;}
+   const startsNew=/^[0-9,πe]$/.test(key)||key==='√('||key==='sin('||key==='cos('||key==='tan('||key==='log('||key==='ln('||key==='abs(';
+   const base=dashCalcJustEvaluated&&startsNew?'':current;
+   change(base+key);
+   dashCalcJustEvaluated=false;
+  });
+ });
+ refresh();
+}
+
 function bindQuickSearch(){
  const input=$('#search'),results=$('#quick-search-results');
  if(!input||!results)return;
@@ -1017,6 +1196,7 @@ function bindQuickSearch(){
  fillResults();
 }
 function bind(){
+ bindDashboardCalculator();
  bindQuickSearch();
  const contactInput=$('#contact-name-search');
  if(contactInput){
