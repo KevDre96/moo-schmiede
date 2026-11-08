@@ -602,7 +602,10 @@ function orderCraftBatches(item,amount,recipe){
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
  const current=stock(state);
- const list=Object.keys(needs.make).filter(item=>needs.make[item]>1e-9);
+ // Nur ausdrücklich bestellte, noch offene Produkte anzeigen.
+ // Zwischenprodukte bleiben in der Materialberechnung, aber nicht als eigene Arbeitsgänge sichtbar.
+ const orderedProducts=new Set(order.lines.filter(line=>!line.done&&line.status!=='cancel'&&line.qty>0).map(line=>line.product));
+ const list=Object.keys(needs.make).filter(item=>orderedProducts.has(item)&&needs.make[item]>1e-9);
  const rows=[];
  for(const item of list){
    const amount=needs.make[item],recipe=state.recipes[item];
@@ -615,8 +618,8 @@ function orderManufacturingPanel(order){
    rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Gesamtbedarf für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div>${orderCraftBatches(item,amount,recipe)}</td></tr>`);
  }
  return `<section class="order-needed-card" aria-label="Noch herstellen">
-   <div class="order-needed-header"><h3>Noch herstellen</h3><p>Benötigte End- und Zwischenprodukte für diese Bestellung.</p></div>
-   ${list.length?table(['Material / Produkt','Menge','Aktuell im Lager'],rows):'<p class="order-needed-empty">Für diese Bestellung ist aktuell nichts mehr herzustellen.</p>'}
+   <div class="order-needed-header"><h3>Noch herstellen</h3><p>Nur Produkte aus der Bestellliste – keine zusätzlichen Zwischenprodukte.</p></div>
+   ${list.length?table(['Material / Produkt','Menge','Aktuell im Lager'],rows):'<p class="order-needed-empty">Für die bestellten Produkte ist aktuell nichts mehr herzustellen.</p>'}
    ${list.length?'<p class="order-needed-hint">Zutaten laut Rezept für die noch herzustellende Menge (vor Abzug vorhandener Einzelmaterialien).</p>':''}
    ${needs.errors.length?'<p class="order-needed-warning">'+needs.errors.map(esc).join(' · ')+'</p>':''}
  </section>`;
