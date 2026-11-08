@@ -257,6 +257,19 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
   font-size:12px;
   padding:5px 8px;
 }
+
+/* Herstellungsplanung in Paketen mit maximal 100 Rezeptdurchgängen */
+.order-batch-plan{margin-top:11px;padding:11px 12px;border:1px solid #5b4b2e;border-radius:8px;background:#1c1a15}
+.order-batch-title{font-size:11px;font-weight:800;color:#eacb7f;margin-bottom:8px;letter-spacing:.15px}
+.order-batch-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#e6dec9;font-size:11px;margin-bottom:9px}
+.order-batch-summary b{color:#f4d586;font-size:12px}
+.order-batch-row{display:flex;align-items:center;gap:5px 11px;flex-wrap:wrap;padding:9px 0;border-top:1px solid #ffffff17;font-size:11px}
+.order-batch-row>strong{color:#f3e3c2;font-weight:700}
+.order-batch-row>span{color:#d9caab}
+.order-batch-materials{display:flex;flex-wrap:wrap;gap:5px;width:100%;margin-top:2px}
+.order-batch-material{display:inline-flex;background:#29251d;border:1px solid #645437;border-radius:5px;padding:4px 6px;font-weight:600;color:#f0dcb2;font-size:11px}
+.order-batch-overflow{display:block;margin-top:7px;color:#f1bb8b;font-size:10px}
+@media(max-width:600px){.order-batch-plan{padding:9px}.order-batch-summary{gap:4px 8px}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -558,6 +571,26 @@ function orderOverview(){
  const list=state.orders.filter(o=>matches(o.title,o.customer,o.telegram,o.number)&&(overviewFilter==='all'||getOrderStatus(o)===overviewFilter));
  return heading('Bestellübersicht','Alle Kunden, Bestellungen und Fertigungsstände aus deiner Tabelle.',button('CSV exportieren','export-orders','secondary')+button(icon('plus')+' Bestellung hinzufügen','new-order'))+`<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um mehrere Produkte einzutragen und einzeln als fertig abzuhaken.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr class="order-row-clickable" data-order-id="${esc(o.id)}" tabindex="0" aria-label="Bestellung ${esc(o.title)} öffnen"><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${esc(o.telegram||'—')}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span></td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}${button('Löschen','delete-order-row','text order-delete-action',`data-id="${o.id}"`)}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
 }
+// Im Spiel können je Arbeitsgang höchstens 100 Rezept-Herstellungen ausgeführt werden.
+// Mengen werden hier für ganze Herstellungen aufgerundet; die allgemeine
+// Bedarfsplanung bleibt unverändert anteilig.
+function orderCraftBatches(item,amount,recipe){
+ if(!recipe||!(recipe.yield>0))return '';
+ const crafts=Math.max(0,Math.ceil(amount/recipe.yield-1e-9));
+ if(!crafts)return '';
+ const full=Math.floor(crafts/100),rest=crafts%100;
+ const batchCount=full+(rest?1:0),produced=crafts*recipe.yield;
+ const materials=perBatch=>recipe.ingredients.length?
+   recipe.ingredients.map(i=>`<span class="order-batch-material">${typeof i.qty==='number'?number(i.qty*perBatch):'?'} × ${esc(i.item)}</span>`).join(''):
+   '<span class="muted">Keine Zutaten hinterlegt</span>';
+ const batch=(label,craftCount)=>`<div class="order-batch-row"><strong>${label}</strong><span>${number(craftCount)}× herstellen → ${number(craftCount*recipe.yield)} Stück</span><div class="order-batch-materials">${materials(craftCount)}</div></div>`;
+ const fullLabel=full===1?'Arbeitsgang 1':`Arbeitsgänge 1–${number(full)} (je Arbeitsgang)`;
+ return `<div class="order-batch-plan"><div class="order-batch-title">Herstellungsplan · maximal 100× je Arbeitsgang</div>
+ <div class="order-batch-summary"><b>${number(crafts)}× herstellen</b><span>→ ${number(batchCount)} ${batchCount===1?'Arbeitsgang':'Arbeitsgänge'}</span><span>· ergibt ${number(produced)} Stück</span></div>
+ ${full?batch(fullLabel,100):''}${rest?batch(`Arbeitsgang ${number(full+1)}`,rest):''}
+ ${produced>amount+1e-7?`<small class="order-batch-overflow">${number(produced-amount)} Stück Mehrproduktion durch ganze Rezeptdurchgänge.</small>`:''}
+ </div>`;
+}
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
  const current=stock(state);
@@ -571,7 +604,7 @@ function orderManufacturingPanel(order){
      const needed=typeof ing.qty==='number'&&recipe.yield>0?number(amount/recipe.yield*ing.qty):'?';
      return `<span class="order-needed-material ${needed==='?'?'order-needed-material-unknown':''}">${needed} × ${esc(ing.item)}</span>`;
    }).join(''):'<span class="muted">Keine Zutaten hinterlegt</span>';
-   rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Zutaten für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div></td></tr>`);
+   rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Zutaten für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div>${orderCraftBatches(item,amount,recipe)}</td></tr>`);
  }
  return `<section class="order-needed-card" aria-label="Noch herstellen">
    <div class="order-needed-header"><h3>Noch herstellen</h3><p>Benötigte End- und Zwischenprodukte für diese Bestellung.</p></div>
