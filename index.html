@@ -260,9 +260,7 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 
 /* Herstellungsplanung in Paketen mit maximal 100 Rezeptdurchgängen */
 .order-batch-plan{margin-top:11px;padding:11px 12px;border:1px solid #5b4b2e;border-radius:8px;background:#1c1a15}
-.order-batch-title{font-size:11px;font-weight:800;color:#eacb7f;margin-bottom:8px;letter-spacing:.15px}
-.order-batch-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#e6dec9;font-size:11px;margin-bottom:9px}
-.order-batch-summary b{color:#f4d586;font-size:12px}
+.order-batch-row:first-child{border-top:0;padding-top:0}
 .order-batch-row{display:flex;align-items:center;gap:5px 11px;flex-wrap:wrap;padding:9px 0;border-top:1px solid #ffffff17;font-size:11px}
 .order-batch-row>strong{color:#f3e3c2;font-weight:700}
 .order-batch-row>span{color:#d9caab}
@@ -579,14 +577,13 @@ function orderCraftBatches(item,amount,recipe){
  const crafts=Math.max(0,Math.ceil(amount/recipe.yield-1e-9));
  if(!crafts)return '';
  const full=Math.floor(crafts/100),rest=crafts%100;
- const batchCount=full+(rest?1:0),produced=crafts*recipe.yield;
+ const produced=crafts*recipe.yield;
  const materials=perBatch=>recipe.ingredients.length?
    recipe.ingredients.map(i=>`<span class="order-batch-material">${typeof i.qty==='number'?number(i.qty*perBatch):'?'} × ${esc(i.item)}</span>`).join(''):
    '<span class="muted">Keine Zutaten hinterlegt</span>';
  const batch=(label,craftCount)=>`<div class="order-batch-row"><strong>${label}</strong><span>${number(craftCount)}× herstellen → ${number(craftCount*recipe.yield)} Stück</span><div class="order-batch-materials">${materials(craftCount)}</div></div>`;
  const fullLabel=full===1?'Arbeitsgang 1':`Arbeitsgänge 1–${number(full)} (je Arbeitsgang)`;
- return `<div class="order-batch-plan"><div class="order-batch-title">Herstellungsplan · maximal 100× je Arbeitsgang</div>
- <div class="order-batch-summary"><b>${number(crafts)}× herstellen</b><span>→ ${number(batchCount)} ${batchCount===1?'Arbeitsgang':'Arbeitsgänge'}</span><span>· ergibt ${number(produced)} Stück</span></div>
+ return `<div class="order-batch-plan">
  ${full?batch(fullLabel,100):''}${rest?batch(`Arbeitsgang ${number(full+1)}`,rest):''}
  ${produced>amount+1e-7?`<small class="order-batch-overflow">${number(produced-amount)} Stück Mehrproduktion durch ganze Rezeptdurchgänge.</small>`:''}
  </div>`;
