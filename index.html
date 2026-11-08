@@ -190,7 +190,7 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 }
 .order-needed-header h3{font:700 19px Georgia,serif;margin:0 0 5px;color:#efdfc1}
 .order-needed-header p{font-size:11px;color:var(--muted);margin:0}
-.order-needed-card .table-wrap{max-height:175px;overflow:auto;margin-top:12px}
+.order-needed-card .table-wrap{max-height:355px;overflow:auto;margin-top:12px}
 .order-needed-card .table-wrap th{font-size:10px;padding:9px 7px}
 .order-needed-card .table-wrap td{font-size:11px;padding:9px 7px}
 .order-needed-card .table-wrap td b{font-weight:600}
@@ -218,6 +218,15 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .price-search-count{font-size:11px;color:#b7ab95;margin-left:auto}
 .price-search-empty{font-size:12px;color:#cbb996;padding:12px 4px}
 @media(max-width:620px){.price-search-row{align-items:stretch;gap:8px}.price-search-row label,.price-search-row input,.price-search-count{width:100%;max-width:none}.price-search-count{margin-left:0}}
+
+/* Zutaten je offener Bestellung direkt beim herzustellenden Produkt */
+.order-needed-ingredients{margin-top:8px;max-width:520px}
+.order-needed-ingredients>small{display:block;color:#c9b98e;font-size:10px;margin-bottom:5px}
+.order-needed-material-list{display:flex;gap:5px;flex-wrap:wrap}
+.order-needed-material{display:inline-block;border:1px solid #584a31;border-radius:5px;padding:4px 6px;background:#d8b5650a;color:#f0dfbc;font-size:11px;font-weight:600;white-space:nowrap}
+.order-needed-material-unknown{color:#efa79c;border-color:#b36e5e}
+.order-needed-hint{font-size:10px;color:#a99e89;margin:10px 0 0;line-height:1.4}
+@media(max-width:600px){.order-needed-card .table-wrap{max-height:360px}.order-needed-material{white-space:normal}}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -521,10 +530,21 @@ function orderOverview(){
 }
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
+ const current=stock(state);
  const list=Object.keys(needs.make).filter(item=>needs.make[item]>1e-9);
+ const rows=list.map(item=>{
+   const amount=needs.make[item],recipe=state.recipes[item];
+   const ingredients=recipe?.ingredients||[];
+   const details=ingredients.length?ingredients.map(ing=>{
+     const needed=typeof ing.qty==='number'&&recipe.yield>0?number(amount/recipe.yield*ing.qty):'?';
+     return `<span class="order-needed-material ${needed==='?'?'order-needed-material-unknown':''}">${needed} × ${esc(ing.item)}</span>`;
+   }).join(''):'<span class="muted">Keine Zutaten hinterlegt</span>';
+   return `<tr><td><b>${esc(item)}</b><div class="order-needed-ingredients"><small>Materialien für ${number(amount)} Stück:</small><div class="order-needed-material-list">${details}</div></div></td><td class="num gold">${number(amount)}</td><td class="num">${number(current[item]||0)}</td></tr>`;
+ });
  return `<section class="order-needed-card" aria-label="Noch herstellen">
    <div class="order-needed-header"><h3>Noch herstellen</h3><p>Benötigte End- und Zwischenprodukte für diese Bestellung.</p></div>
-   ${list.length?requirementTable(needs.make):'<p class="order-needed-empty">Für diese Bestellung ist aktuell nichts mehr herzustellen.</p>'}
+   ${list.length?table(['Material / Produkt','Menge','Aktuell im Lager'],rows):'<p class="order-needed-empty">Für diese Bestellung ist aktuell nichts mehr herzustellen.</p>'}
+   ${list.length?'<p class="order-needed-hint">Materialmengen gemäß Rezept, vor Abzug bereits vorhandener Zutaten.</p>':''}
    ${needs.errors.length?'<p class="order-needed-warning">'+needs.errors.map(esc).join(' · ')+'</p>':''}
  </section>`;
 }
