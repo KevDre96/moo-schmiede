@@ -343,6 +343,31 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .dashboard-calc-help{margin:10px 0 0!important;color:#b9ad95!important;font-size:10px!important;line-height:1.5!important}
 @media(max-width:760px){.dashboard-calculator{max-width:none;padding:12px}.dashboard-calc-key{min-height:45px;font-size:13px}.dashboard-calc-answer{font-size:23px}}
 
+/* Eigener, online gespeicherter Herstellungsplan ohne Kundenbestellung */
+.personal-work-card{margin-bottom:27px}
+.personal-work-card .section-head{align-items:center}
+.personal-work-card .section-head h3{font-size:22px;margin:0 0 7px}
+.personal-work-card .section-head p{font-size:12px;margin:0}
+.personal-work-items{display:flex;flex-direction:column;gap:8px;margin:12px 0 19px}
+.personal-work-item{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;border:1px solid #443c30;background:#201e1a;padding:12px 13px;border-radius:9px}
+.personal-work-item.is-done{opacity:.72}
+.personal-work-item-info{flex:1;min-width:170px}
+.personal-work-item-info b{display:block;color:#f1eadb;font-size:13px}
+.personal-work-item-info small{display:block;margin-top:5px;white-space:normal;overflow-wrap:anywhere}
+.personal-work-item-amount{color:var(--gold);font-weight:700;white-space:nowrap}
+.personal-work-actions{display:flex;flex-wrap:wrap;gap:12px}
+.personal-work-actions .text{font-size:12px}
+.personal-work-actions .personal-work-remove{color:#efaaa1}
+.personal-work-card .personal-work-needs{margin-top:18px}
+.personal-work-card .personal-work-needs .table-wrap{max-height:560px}
+.personal-work-card .personal-work-needs .order-needed-ingredients{max-width:none}
+.personal-work-note{font-size:11px;color:#b7a88d;line-height:1.6;margin:12px 0 0}
+@media(max-width:760px){
+ .personal-work-card .section-head{align-items:stretch}
+ .personal-work-card .section-head .actions button{width:100%}
+ .personal-work-item{align-items:flex-start}
+ .personal-work-actions{width:100%}
+}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -421,9 +446,17 @@ function validState(s){
       noteIds.add(n.id);
     }
   }
+  if(s.personalManufacture===undefined)s.personalManufacture=[];
+  if(!Array.isArray(s.personalManufacture)||s.personalManufacture.length>200)throw new Error('Ungültige Eigenbedarfs-Liste (maximal 200 Produkte).');
+  for(const entry of s.personalManufacture){
+    if(!entry||typeof entry.id!=='string'||typeof entry.product!=='string'||!Object.hasOwn(s.recipes,entry.product)||
+       !Number.isSafeInteger(entry.qty)||entry.qty<1||entry.qty>10000000||
+       typeof entry.done!=='boolean'||typeof entry.note!=='string'||entry.note.length>500)
+      throw new Error('Ungültiger Eigenbedarfs-Eintrag.');
+  }
   const finite=v=>typeof v==='number'&&Number.isFinite(v);const badkey=k=>['__proto__','constructor','prototype'].includes(k);
   const safeId=id=>typeof id==='string'&&/^[a-z0-9-]+$/i.test(id);
-  const ids=[...s.orders,...s.contacts,...s.purchases,...s.adjustments,...s.orders.flatMap(o=>o.lines||[])].map(x=>x.id);
+  const ids=[...s.orders,...s.contacts,...s.purchases,...s.adjustments,...s.personalManufacture,...s.orders.flatMap(o=>o.lines||[])].map(x=>x.id);
   if(ids.some(id=>!safeId(id))||new Set(ids).size!==ids.length)throw new Error('Ungültige oder doppelte Datensatznummern.');
   if(Object.keys(s.inventory).some(badkey)||Object.keys(s.recipes).some(badkey))throw new Error('Ungültige Artikel.');
   for(const v of Object.values(s.inventory))if(!finite(v.opening))throw new Error('Ungültiger Lagerbestand.');
@@ -567,6 +600,7 @@ if(!Array.isArray(state.shoppingNotes)){
  const legacy=state.shoppingNote.trim();
  state.shoppingNotes=legacy?[{id:uid(),text:legacy,createdAt:new Date().toISOString()}]:[];
 }
+if(!Array.isArray(state.personalManufacture))state.personalManufacture=[];
 for(const o of state.orders)for(const l of o.lines)if(l.done&&!l.booking){l.booking=explode(state,l.product,l.qty,l.mode);for(const[k,n]of Object.entries(l.booking))state.inventory[k].opening+=n;}
 if(!nav.some(n=>n[0]===view))view='dashboard';
 const products=()=>Object.keys(state.recipes).sort((a,b)=>a.localeCompare(b,'de'));
@@ -694,7 +728,63 @@ function ordersView(){
 function inventoryView(){const current=stock(state),need=plan(state,openLines());const list=items().filter(k=>matches(k,state.inventory[k].note)&&(inventoryFilter==='all'||inventoryFilter==='raw'&&!state.recipes[k]||inventoryFilter==='product'&&state.recipes[k]||inventoryFilter==='short'&&(need.buy[k]||need.make[k]||current[k]<0)));return heading('Lagerbestand','Einkäufe und fertige Bestellungen werden automatisch verrechnet.',button(icon('plus')+' Einkauf erfassen','new-purchase'))+`<div class="stats compact">${summary('Artikel im Lager',items().filter(k=>current[k]>0).length,'Mit positivem Bestand','inventory')}${summary('Fehlende Rohstoffe',Object.keys(need.buy).length,'Für offene Bestellungen','orders')}${summary('Zu fertigende Produkte',Object.keys(need.make).length,'Lagerbestand bereits berücksichtigt','manufacture')}</div><div class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle Artikel'],['raw','Rohstoffe'],['product','Produkte'],['short','Fehlmengen']].map(([v,t])=>`<button class="${inventoryFilter===v?'active':''}" data-action="inventory-filter" data-id="${v}">${t}</button>`).join('')}</div><small class="muted">${list.length} Artikel</small></div>${list.length?table(['Artikel','Art','Lagerbestand','Offener Bedarf','Noch benötigt','Notiz',''],list.map(k=>`<tr><td><b>${esc(k)}</b></td><td><span class="tag">${state.recipes[k]?'Produkt / Bauteil':'Rohstoff'}</span></td><td class="num ${current[k]<0?'negative':''}"><b>${number(current[k])}</b></td><td class="num">${number(need.demand[k])}</td><td class="num">${(need.buy[k]||need.make[k])?`<span class="badge open">${number(need.buy[k]||need.make[k])} ${state.recipes[k]?'herstellen':'beschaffen'}</span>`:'<span class="muted">—</span>'}</td><td>${esc(state.inventory[k].note)}</td><td>${button('Bestand korrigieren','adjust-stock','text',`data-item="${esc(k)}"`)}</td></tr>`)):empty('Keine Artikel gefunden','Passe Suche oder Filter an.')}</div><p class="footnote">Bestandskorrekturen erfassen einen einmaligen Zu- oder Abgang. Einkäufe bitte im Einkaufsbuch eintragen.</p>`;}
 function purchasesView(){const list=state.purchases.filter(p=>matches(p.item,p.supplier,p.note)).slice().reverse();return heading('Einkäufe','Neue Ware erfassen. Dein Lager wächst automatisch mit.',button(icon('plus')+' Einkauf erfassen','new-purchase'))+`<div class="panel">${list.length?table(['Datum','Material / Artikel','Menge','Stückpreis','Gesamtpreis','Lieferant','Notizen',''],list.map(p=>`<tr><td>${date(p.date)}</td><td><b>${esc(p.item)}</b><small class="positive">Im Lager gebucht</small></td><td class="num">+${number(p.qty)}</td><td class="num">${money(p.price)}</td><td class="num">${p.qty===0?money(0):money(p.price===null?null:p.price*p.qty)}</td><td>${esc(p.supplier)}</td><td>${esc(p.note)}</td><td>${button('Bearbeiten','edit-purchase','text',`data-id="${p.id}"`)}</td></tr>`)):empty('Der nächste Einkauf wartet','Wähle z. B. Eisen, Kohle oder Kupfer und trage die gekaufte Menge ein.',button('Ersten Einkauf erfassen','new-purchase'))}</div><div class="callout">${icon('inventory')}<p><b>Einmal eintragen genügt.</b> Einkäufe bleiben im Verlauf stehen. Bearbeiten oder Löschen korrigiert den Lagerbestand entsprechend.</p></div>`;}
 function requirementTable(map,type='raw'){const current=stock(state);const keys=Object.keys(map).filter(k=>map[k]>1e-9);return keys.length?table(['Material / Produkt','Menge','Aktuell im Lager'],keys.map(k=>`<tr><td><b>${esc(k)}</b></td><td class="num"><span class="${type==='buy'?'negative':'gold'}">${number(map[k])}</span></td><td class="num">${number(current[k])}</td></tr>`)):empty('Kein Bedarf','Für diese Auswahl wird nichts benötigt.');}
-function manufactureView(){const lines=calcLines.length?calcLines:openLines();let p=plan(state,lines);return heading('Herstellungsrechner','Von der Bestellung bis zum Erz – alle Rezeptstufen werden berücksichtigt.',button('Offene Bestellungen verwenden','reset-calculator','secondary'))+`<section class="panel calculator"><div class="section-head"><div><h3>${calcLines.length?'Eigene Planung':'Alle offenen Bestellungen'}</h3><p>${calcLines.length?'Die eigene Planung ersetzt hier die Auftragsauswahl.':'Lager und Zwischenprodukte sind bereits eingerechnet.'}</p></div>${button(icon('plus')+' Produkt planen','new-calc','secondary')}</div>${calcLines.length?calcLines.map((l,i)=>`<div class="calc-line"><b>${esc(l.product)}</b><span>${number(l.qty)} Stück</span>${button('Entfernen','remove-calc','text',`data-id="${i}"`)}</div>`).join(''):`<p class="muted">${openLines().length} offene Produktpositionen aus ${state.orders.filter(o=>o.lines.some(l=>!l.done&&l.qty>0&&l.status!=='cancel')).length} Bestellungen</p>`}</section>${p.errors.map(e=>`<p class="error-box">${esc(e)}. Bitte unter Rezepte ergänzen.</p>`).join('')}<div class="two-col"><section class="panel">${heading('Noch herstellen','Benötigte End- und Zwischenprodukte.')}${requirementTable(p.make)}</section><section class="panel">${heading('Noch beschaffen','Rohstoffe nach Abzug des vorhandenen Lagers.')}${requirementTable(p.buy,'buy')}</section></div><p class="footnote">Es wird anteilig pro gewünschtem Stück gerechnet, wie in deiner Tabelle. Keine automatische Aufrundung auf Herstellungsdurchgänge. Fehlende Rezeptmengen werden ausdrücklich gemeldet.</p>`;}
+
+function personalManufactureModal(entry){
+ modal(entry?'Eigenbedarf bearbeiten':'Produkt für mich planen',
+   select('Produkt','product',products(),entry?.product,false)+
+   field('Stückzahl','qty',entry?.qty??1,'number','min="1" step="1" required')+
+   textarea('Notiz (optional)','note',entry?.note||'')+
+   '<p class="form-hint span2">Wird unabhängig von Bestellungen online gespeichert. „Fertig“ markiert nur diese Planung und bucht keinen Lagerbestand ab.</p>',
+   form=>{
+     const product=String(form.get('product')||'');
+     const qty=nval(form,'qty');
+     const note=String(form.get('note')||'').trim();
+     if(!Object.hasOwn(state.recipes,product))throw new Error('Bitte ein gültiges Produkt auswählen.');
+     if(!Number.isSafeInteger(qty)||qty<1||qty>10000000)throw new Error('Bitte eine ganze Stückzahl von 1 bis 10.000.000 eingeben.');
+     if(note.length>500)throw new Error('Die Notiz darf maximal 500 Zeichen haben.');
+     if(entry){
+       const target=state.personalManufacture.find(item=>item.id===entry.id);
+       if(!target)throw new Error('Der Eintrag wurde nicht gefunden.');
+       Object.assign(target,{product,qty,note});
+     }else{
+       if(state.personalManufacture.length>=200)throw new Error('Maximal 200 Eigenbedarfs-Einträge.');
+       state.personalManufacture.push({id:uid(),product,qty,note,done:false});
+     }
+   }
+ );
+}
+function personalManufacturePanel(){
+ const entries=state.personalManufacture||[];
+ const pending=entries.filter(entry=>!entry.done);
+ const requirements=plan(state,pending.map(entry=>({product:entry.product,qty:entry.qty,done:false,status:'open'})));
+ const current=stock(state);
+ const requested=[...new Set(pending.map(entry=>entry.product))];
+ const targets=requested.filter(item=>(requirements.make[item]||0)>1e-9);
+ const rows=[];
+ for(const item of targets){
+   const amount=requirements.make[item];
+   const recipe=state.recipes[item];
+   const ingredients=recipe?.ingredients||[];
+   rows.push(`<tr class="order-needed-product-row"><td><b>${esc(item)}</b></td><td class="num gold"><b>${number(amount)}</b></td><td class="num">${number(current[item]||0)}</td></tr>`);
+   const details=ingredients.length?ingredients.map(ing=>{
+     const needed=typeof ing.qty==='number'&&recipe.yield>0?number(Math.ceil(amount/recipe.yield-1e-9)*ing.qty):'?';
+     return `<span class="order-needed-material ${needed==='?'?'order-needed-material-unknown':''}">${needed} × ${esc(ing.item)}</span>`;
+   }).join(''):'<span class="muted">Keine Zutaten hinterlegt</span>';
+   rows.push(`<tr class="order-needed-detail-row"><td colspan="3"><div class="order-needed-ingredients"><strong>Gesamtbedarf für ${number(amount)} × ${esc(item)}:</strong><div class="order-needed-material-list">${details}</div></div>${orderCraftBatches(item,amount,recipe)}</td></tr>`);
+ }
+ return `<section class="panel personal-work-card">
+   <div class="section-head"><div><h3>Noch herstellen · Für mich</h3><p>Eigene Produkte und Mengen – ganz ohne Kundenbestellung.</p></div><div class="actions">${button(icon('plus')+' Produkt hinzufügen','new-personal-work')}</div></div>
+   ${entries.length?`<div class="personal-work-items">${entries.map(entry=>`<div class="personal-work-item ${entry.done?'is-done':''}"><div class="personal-work-item-info"><b>${esc(entry.product)}</b>${entry.note?`<small>${esc(entry.note)}</small>`:''}</div><span class="personal-work-item-amount">${number(entry.qty)} Stück</span><span class="badge ${entry.done?'done':'open'}">${entry.done?'Fertig':'Offen'}</span><div class="personal-work-actions">${button(entry.done?'Wieder öffnen':'Fertig','toggle-personal-work','text',`data-id="${esc(entry.id)}"`)}${button('Bearbeiten','edit-personal-work','text',`data-id="${esc(entry.id)}"`)}${button('Löschen','delete-personal-work','text personal-work-remove',`data-id="${esc(entry.id)}"`)}</div></div>`).join('')}</div>`:'<p class="muted">Noch keine eigenen Produkte geplant. Klicke auf „Produkt hinzufügen“.</p>'}
+   <div class="order-needed-card personal-work-needs" aria-label="Noch herstellen für mich">
+     <div class="order-needed-header"><h3>Noch herstellen</h3><p>Nur deine offenen Eigenbedarfs-Produkte mit Zutaten und erstem Arbeitsgang.</p></div>
+     ${targets.length?table(['Material / Produkt','Menge','Aktuell im Lager'],rows):'<p class="order-needed-empty">Für deine offenen Eigenbedarfsprodukte ist aktuell nichts mehr herzustellen.</p>'}
+     ${requirements.errors.length?`<p class="order-needed-warning">${requirements.errors.map(esc).join(' · ')}</p>`:''}
+   </div>
+   <p class="personal-work-note">Der Bedarf wird unabhängig von Kundenbestellungen berechnet. Abhaken oder Löschen verändert weder Bestellungen noch Lagerbestände; die Planung wird in der gemeinsamen Cloud gespeichert.</p>
+ </section>`;
+}
+
+function manufactureView(){const lines=calcLines.length?calcLines:openLines();let p=plan(state,lines);return heading('Herstellung','Eigene Produkte unabhängig von Kundenbestellungen planen.')+personalManufacturePanel()+heading('Herstellungsrechner','Von der Bestellung bis zum Erz – alle Rezeptstufen werden berücksichtigt.',button('Offene Bestellungen verwenden','reset-calculator','secondary'))+`<section class="panel calculator"><div class="section-head"><div><h3>${calcLines.length?'Eigene Planung':'Alle offenen Bestellungen'}</h3><p>${calcLines.length?'Die eigene Planung ersetzt hier die Auftragsauswahl.':'Lager und Zwischenprodukte sind bereits eingerechnet.'}</p></div>${button(icon('plus')+' Produkt planen','new-calc','secondary')}</div>${calcLines.length?calcLines.map((l,i)=>`<div class="calc-line"><b>${esc(l.product)}</b><span>${number(l.qty)} Stück</span>${button('Entfernen','remove-calc','text',`data-id="${i}"`)}</div>`).join(''):`<p class="muted">${openLines().length} offene Produktpositionen aus ${state.orders.filter(o=>o.lines.some(l=>!l.done&&l.qty>0&&l.status!=='cancel')).length} Bestellungen</p>`}</section>${p.errors.map(e=>`<p class="error-box">${esc(e)}. Bitte unter Rezepte ergänzen.</p>`).join('')}<div class="two-col"><section class="panel">${heading('Rezeptstufen im Rechner','Benötigte End- und Zwischenprodukte für die Rechnerauswahl.')}${requirementTable(p.make)}</section><section class="panel">${heading('Noch beschaffen','Rohstoffe nach Abzug des vorhandenen Lagers.')}${requirementTable(p.buy,'buy')}</section></div><p class="footnote">Es wird anteilig pro gewünschtem Stück gerechnet, wie in deiner Tabelle. Keine automatische Aufrundung auf Herstellungsdurchgänge. Fehlende Rezeptmengen werden ausdrücklich gemeldet.</p>`;}
 const smeltProducts=['Rennhufeisen','Goldbarren','Messingbarren','Kupferbarren','Silberbarren','Gehärteter Eisenbarren','Eisenbarren','Bleibarren'];
 function smeltView(){let totals={},raw={},errors=[],active=false;for(const k of smeltProducts){const n=smeltQty[k]||0;if(n>0){active=true;try{for(const [item,qty]of Object.entries(explode(state,k,n,'parts')))totals[item]=(totals[item]||0)+qty;for(const [item,qty]of Object.entries(explode(state,k,n,'raw')))raw[item]=(raw[item]||0)+qty;}catch(e){errors.push(e.message);}}}return heading('Schmelze','Barren, Rennhufeisen und dein permanenter Eisenhammer.')+`<div class="two-col"><section class="panel">${heading('Was soll in die Schmelze?','Gewünschte Stückzahl eingeben.')}${table(['Produkt','Gewünschte Anzahl','Ausgabe je Rezept'],smeltProducts.map(k=>`<tr><td><b>${esc(k)}</b></td><td><input class="smelt-qty" data-item="${esc(k)}" type="text" inputmode="decimal" autocomplete="off" pattern="[0-9]+([.,][0-9]+)?" value="${smeltQty[k]>0?smeltQty[k]:''}" aria-label="Anzahl ${esc(k)}"></td><td class="num">${number(state.recipes[k]?.yield)}</td></tr>`))}<div class="hammer" id="smelt-hammer">${icon('manufacture')}<div><b>${active?'1 Eisenhammer benötigt':'Eisenhammer'}</b><small>Permanent · wird nicht verbraucht oder multipliziert</small></div></div></section><section id="smelt-results"><section class="panel">${heading('Direkte Zutaten','Gesamtbedarf für alle eingetragenen Produkte.')}${requirementTable(totals)}</section>${errors.map(e=>`<p class="error-box">${esc(e)}</p>`).join('')}<details class="panel"><summary>Bis zu den Rohstoffen aufschlüsseln</summary><p class="muted">Bruttobedarf ohne Lagerabzug.</p>${requirementTable(raw)}</details></section></div><p class="footnote">Anteilig gerechnet: z. B. 1 Goldbarren = 1 Kohle + 10 Goldnuggets. Der Rechner bucht keine Lagerbewegungen.</p>`;}
 function recipesView(){const list=products().filter(k=>matches(k,...state.recipes[k].ingredients.map(i=>i.item)));return heading('Rezeptübersicht','Alle Rezepte, Ausgabemengen und Zutaten aus deiner Tabelle.')+`<section class="panel"><div class="toolbar"><span class="muted">${list.length} von ${products().length} Rezepten</span><small>Mit „Bearbeiten“ Mengen und Materialien jederzeit anpassen.</small></div>${table(['Produkt','Ausgabe je Herstellung','Zutaten je Rezept','Status','Aktionen'],list.map(k=>{const r=state.recipes[k],missing=!r.ingredients.length||r.ingredients.some(i=>typeof i.qty!=='number');return `<tr><td><b>${esc(k)}</b></td><td class="num">${number(r.yield)} Stück</td><td><div class="ingredient-tags">${r.ingredients.map(i=>`<span class="tag ${i.qty===null?'negative':''}">${i.qty===null?'?':number(i.qty)} × ${esc(i.item)}</span>`).join('')}</div></td><td><span class="badge ${missing?'open':'done'}">${missing?'Menge fehlt':'Vollständig'}</span></td><td>${button('Bearbeiten','edit-recipe','text',`data-item="${esc(k)}"`)}</td></tr>`}))}</section>`;}
@@ -1286,6 +1376,10 @@ function bind(){
  'inventory-filter':()=>{inventoryFilter=id;render();},'new-purchase':()=>purchaseModal(),'edit-purchase':()=>purchaseModal(state.purchases.find(p=>p.id===id)),
  'adjust-stock':()=>{const now=stock(state)[k]||0;modal('Bestand korrigieren',`<p class="span2"><b>${esc(k)}</b> · Aktueller Bestand: ${number(now)}</p>`+field('Tatsächlich gezählter Bestand','count',now,'number','min="0" step="any" required')+field('Grund','reason','','text','required placeholder="z. B. Inventur / gesammelte Erze"')+textarea('Artikelnotiz','note',state.inventory[k].note),f=>{const desired=nval(f,'count');state.adjustments.push({id:uid(),date:today(),item:k,qty:desired-(stock(state)[k]||0),note:f.get('reason')});state.inventory[k].note=f.get('note');});},
  'new-calc':()=>lineModal(null,null,true),'remove-calc':()=>{calcLines.splice(Number(id),1);render();},'reset-calculator':()=>{calcLines=[];render();},
+ 'new-personal-work':()=>personalManufactureModal(),
+ 'edit-personal-work':()=>personalManufactureModal(state.personalManufacture.find(entry=>entry.id===id)),
+ 'toggle-personal-work':()=>mutate(()=>{const entry=state.personalManufacture.find(entry=>entry.id===id);if(!entry)return;entry.done=!entry.done;},'Eigenbedarf aktualisiert – ohne Lagerbuchung'),
+ 'delete-personal-work':()=>{const entry=state.personalManufacture.find(entry=>entry.id===id);if(!entry)return;if(confirm('Eigenbedarf „'+entry.product+'“ wirklich entfernen?'))mutate(()=>{state.personalManufacture=state.personalManufacture.filter(item=>item.id!==id);},'Eigenbedarf entfernt');},
  'new-contact':()=>contactModal(),'edit-contact':()=>contactModal(state.contacts.find(c=>c.id===id)),
  'delete-contact-row':()=>{const contact=state.contacts.find(c=>c.id===id);if(!contact)return;if(confirm('Kontakt „'+contact.name+'“ wirklich löschen? Bestehende Bestellungen bleiben erhalten.'))mutate(()=>{state.contacts=state.contacts.filter(c=>c.id!==id);},'Kontakt gelöscht');},
  'price-tab':()=>{priceTab=id;render();},'edit-price':()=>{
