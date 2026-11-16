@@ -820,7 +820,7 @@ function orderMaterialSummary(order){
  const direct=sorted(result.direct),raw=sorted(result.raw);
  const rows=data=>data.length?data.map(([item,qty])=>`<div class="order-material-item"><span>${esc(item)}</span><b>${number(qty)} ×</b></div>`).join(''):'<p class="order-material-empty">Keine Materialien hinterlegt.</p>';
  return `<section class="order-material-summary" aria-label="Materialbedarf der kompletten Bestellung">
- <header class="order-material-head"><h3>Gesamter Materialbedarf</h3><p>Alle ${number(result.lines.length)} Positionen · ${number(Object.keys(result.requested).length)} Produkte</p></header>
+ <div class="order-material-head"><h3>Gesamter Materialbedarf</h3><p>Alle ${number(result.lines.length)} Positionen · ${number(Object.keys(result.requested).length)} Produkte</p></div>
  <p class="order-material-note">Alle Mengen zusammengerechnet – <b>ohne Lagerabzug</b>. Lagerbestand selbst im Spiel prüfen.</p>
  <h4>Benötigte Zutaten insgesamt</h4><div class="order-material-list">${rows(direct)}</div>
  <details class="order-material-raw"><summary>Rohstoffe aller Rezeptstufen anzeigen (${number(raw.length)})</summary>
