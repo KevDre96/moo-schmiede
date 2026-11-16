@@ -390,6 +390,30 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .telegram-copy-field .telegram-copy-action{font-size:11px;color:var(--gold);font-weight:650;padding:4px 6px;border:1px solid #655132;border-radius:6px;background:#d8b5650b;white-space:nowrap}
 .telegram-copy-field .telegram-copy-action:hover{background:#d8b56522;text-decoration:none;border-color:var(--gold)}
 .telegram-copy-field .telegram-copy-action:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* Linke Materialübersicht für komplette Bestellmenge, ohne Lagerberechnung */
+.order-detail-actions-row{grid-template-columns:minmax(280px,.85fr) minmax(400px,1.55fr);align-items:stretch;gap:17px}
+.order-detail-left,.order-detail-right{display:flex;flex-direction:column;gap:14px;min-width:0}
+.order-detail-left .order-detail-buttons{margin-top:auto}
+.order-detail-right .order-needed-card{grid-column:auto;grid-row:auto}
+.order-detail-right .order-detail-add{margin-top:auto;align-self:flex-end;grid-column:auto;grid-row:auto}
+.order-material-summary{min-width:0;flex:1;background:#171715;border:1px solid #544534;border-radius:12px;padding:16px;color:var(--ink)}
+.order-material-head h3{font:700 19px Georgia,serif;margin:0 0 6px;color:#efdfc1}
+.order-material-head p{font-size:11px;color:#c9b99b;margin:0}
+.order-material-note{font-size:11px;line-height:1.55;color:#aa9d85;margin:13px 0}
+.order-material-summary h4{font-size:12px;margin:17px 0 9px;color:#e3c580}
+.order-material-list{display:flex;flex-direction:column;gap:5px;max-height:380px;overflow:auto;overscroll-behavior:contain}
+.order-material-item{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:9px 10px;border:1px solid #3b3428;background:#24211b;border-radius:6px;font-size:12px;line-height:1.3}
+.order-material-item span{overflow-wrap:anywhere;min-width:0}
+.order-material-item b{flex:none;white-space:nowrap;color:#edca79;font-size:12px}
+.order-material-empty{font-size:11px;color:var(--muted);margin:8px 0}
+.order-material-raw{margin-top:17px;border-top:1px solid #514330;padding-top:12px}
+.order-material-raw summary{cursor:pointer;color:#e8c97f;font-size:12px;font-weight:650}
+.order-material-raw summary:hover{text-decoration:underline}
+.order-material-warnings{color:#efab9a;font-size:11px;line-height:1.5;margin:13px 0 0}
+@media(max-width:1050px){.order-detail-actions-row{grid-template-columns:1fr;align-items:stretch}.order-detail-left .order-detail-buttons{margin-top:0}.order-detail-add{margin-top:0}}
+@media(max-width:600px){.order-detail-actions-row{display:flex;flex-direction:column;gap:12px}.order-detail-right .order-detail-add{align-self:stretch}.order-material-summary{padding:14px}.order-material-list{max-height:260px}}
+
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -751,6 +775,59 @@ function orderCraftBatches(item,amount,recipe){
    '<span class="muted">Keine Zutaten hinterlegt</span>';
  return `<div class="order-batch-plan"><div class="order-batch-row"><strong>Arbeitsgang 1 · ${number(craftsThisBatch)}× herstellen</strong><span>→ ${number(craftsThisBatch*recipe.yield)} Stück</span><div class="order-batch-materials">${materials}</div></div></div>`;
 }
+
+function orderMaterialBreakdown(order){
+ const lines=order.lines.filter(l=>l.qty>0&&l.status!=='cancel');
+ const requested=Object.create(null),direct=Object.create(null),raw=Object.create(null),needed=Object.create(null),errors=new Set();
+ const add=(map,key,qty)=>{if(Number.isFinite(qty)&&qty>0)map[key]=(map[key]||0)+qty;};
+ const crafts=(qty,recipe)=>Math.max(0,Math.ceil(qty/recipe.yield-1e-9));
+ for(const line of lines)add(requested,line.product,line.qty);
+ for(const [product,qty] of Object.entries(requested)){
+   const recipe=state.recipes[product];
+   if(!recipe){errors.add('Rezept fehlt: '+product);continue;}
+   if(!recipe.ingredients.length)errors.add('Keine Zutaten hinterlegt: '+product);
+   for(const ing of recipe.ingredients){
+     if(typeof ing.qty!=='number'){errors.add('Rezeptmenge fehlt: '+product+' → '+ing.item);continue;}
+     add(direct,ing.item,crafts(qty,recipe)*ing.qty);
+   }
+ }
+ const nodes=new Set([...Object.keys(state.inventory),...Object.keys(state.recipes)]);
+ for(const recipe of Object.values(state.recipes))for(const ing of recipe.ingredients)nodes.add(ing.item);
+ const degree=Object.create(null);for(const key of nodes)degree[key]=0;
+ for(const recipe of Object.values(state.recipes))for(const ing of recipe.ingredients)degree[ing.item]++;
+ for(const [key,qty] of Object.entries(requested))add(needed,key,qty);
+ const queue=[...nodes].filter(key=>degree[key]===0);
+ let count=0;
+ while(queue.length){
+   const key=queue.shift(),qty=needed[key]||0,recipe=state.recipes[key];count++;
+   if(qty>0){
+     if(recipe){
+       if(!recipe.ingredients.length)errors.add('Keine Zutaten hinterlegt: '+key);
+       for(const ing of recipe.ingredients){
+         if(typeof ing.qty!=='number'){errors.add('Rezeptmenge fehlt: '+key+' → '+ing.item);continue;}
+         add(needed,ing.item,crafts(qty,recipe)*ing.qty);
+       }
+     }else add(raw,key,qty);
+   }
+   if(recipe)for(const ing of recipe.ingredients){degree[ing.item]--;if(degree[ing.item]===0)queue.push(ing.item);}
+ }
+ if(count<nodes.size)errors.add('Ein Rezept enthält einen Kreislauf.');
+ return {lines,requested,direct,raw,errors:[...errors]};
+}
+function orderMaterialSummary(order){
+ const result=orderMaterialBreakdown(order);
+ const sorted=map=>Object.entries(map).filter(([,qty])=>qty>1e-9).sort(([a],[b])=>a.localeCompare(b,'de'));
+ const direct=sorted(result.direct),raw=sorted(result.raw);
+ const rows=data=>data.length?data.map(([item,qty])=>`<div class="order-material-item"><span>${esc(item)}</span><b>${number(qty)} ×</b></div>`).join(''):'<p class="order-material-empty">Keine Materialien hinterlegt.</p>';
+ return `<section class="order-material-summary" aria-label="Materialbedarf der kompletten Bestellung">
+ <header class="order-material-head"><h3>Gesamter Materialbedarf</h3><p>Alle ${number(result.lines.length)} Positionen · ${number(Object.keys(result.requested).length)} Produkte</p></header>
+ <p class="order-material-note">Alle Mengen zusammengerechnet – <b>ohne Lagerabzug</b>. Lagerbestand selbst im Spiel prüfen.</p>
+ <h4>Benötigte Zutaten insgesamt</h4><div class="order-material-list">${rows(direct)}</div>
+ <details class="order-material-raw"><summary>Rohstoffe aller Rezeptstufen anzeigen (${number(raw.length)})</summary>
+ <p class="order-material-note">Über alle Rezeptstufen berechnet, ohne Lagerbestand. Nicht zu den Zutaten oben addieren.</p><div class="order-material-list">${rows(raw)}</div></details>
+ ${result.errors.length?`<p class="order-material-warnings">${result.errors.map(esc).join(' · ')}</p>`:''}
+ </section>`;
+}
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
  const current=stock(state);
@@ -781,7 +858,7 @@ function ordersView(){
  if(!order)return orderOverview();
  const cards=state.orders.filter(o=>matches(o.title,o.customer,o.telegram)).map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length;return `<button class="order-card ${o.id===selectedOrder?'selected':''}" data-action="open-order" data-id="${o.id}"><span>${esc(o.title)}<small>${esc(o.customer||'Kunde noch offen')}</small></span><span class="badge ${active.length&&done===active.length?'done':'open'}">${done} / ${active.length}</span></button>`}).join('');
  let detail=empty('Eine Bestellung auswählen','Links findest du die Kundenaufträge. Pro Bestellung kannst du mehrere Produkte eintragen.');
- if(order){const lines=order.lines.filter(l=>(orderFilter==='all'||orderFilter==='open'&&!l.done&&l.status!=='cancel'||orderFilter==='done'&&l.done)&&matches(l.product,l.note));detail=`<div class="order-detail-top"><div class="eyebrow">KUNDENBESTELLUNG · ${order.lines.length} POSITIONEN</div><div class="section-head"><div><h2>${esc(order.title)}</h2><p>${esc(order.customer||'Kein Kunde')} <span class="dot">·</span> Telegramm ${esc(order.telegram||'—')}</p></div><div class="total"><small>Bestellwert</small><b>${money(orderTotal(state,order))}</b></div></div>${orderTelegramNotice(order)}<div class="order-detail-actions-row"><div class="order-detail-buttons">${button('Bestellung bearbeiten','edit-order','secondary')}${button('Duplizieren','duplicate-order','secondary')}${button('Löschen','delete-order','danger')}</div>${orderManufacturingPanel(order)}<div class="order-detail-add">${button(icon('plus')+' Produkt hinzufügen','new-line')}</div></div>${order.notes?`<p class="note">${esc(order.notes)}</p>`:''}</div><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['done','Fertig']].map(([v,t])=>`<button data-action="order-filter" data-id="${v}" class="${orderFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">Fertig-Haken buchen den Lagerabzug.</small></div>${lines.length?table(['Fertig','Produkt / Notiz','Anzahl','Status','Stückpreis','Summe','Lagerentnahme',''],lines.map(l=>`<tr class="status-row ${l.qty>0?(l.done?'done':l.status):'zero'}"><td><input type="checkbox" class="finish" aria-label="${esc(l.product)} fertigstellen" data-line="${l.id}" ${l.done?'checked':''} ${l.status==='cancel'?'disabled':''}></td><td><b>${esc(l.product)}</b>${l.note?`<small>${esc(l.note)}</small>`:''}</td><td class="num">${number(l.qty)}</td><td>${badge(l)}</td><td class="num">${money(state.prices[l.product])}</td><td class="num">${money(lineTotal(state,l))}</td><td><small>${({stock:'Endprodukt aus Lager',parts:'Direkte Bauteile',raw:'Aus Rohstoffen'})[l.mode]}</small></td><td>${button('Bearbeiten','edit-line','text',`data-id="${l.id}"`)}</td></tr>`)) :empty('Noch keine Positionen','Füge die gewünschten Endprodukte und Mengen hinzu.')}`;}
+ if(order){const lines=order.lines.filter(l=>(orderFilter==='all'||orderFilter==='open'&&!l.done&&l.status!=='cancel'||orderFilter==='done'&&l.done)&&matches(l.product,l.note));detail=`<div class="order-detail-top"><div class="eyebrow">KUNDENBESTELLUNG · ${order.lines.length} POSITIONEN</div><div class="section-head"><div><h2>${esc(order.title)}</h2><p>${esc(order.customer||'Kein Kunde')} <span class="dot">·</span> Telegramm ${esc(order.telegram||'—')}</p></div><div class="total"><small>Bestellwert</small><b>${money(orderTotal(state,order))}</b></div></div>${orderTelegramNotice(order)}<div class="order-detail-actions-row"><div class="order-detail-left">${orderMaterialSummary(order)}<div class="order-detail-buttons">${button('Bestellung bearbeiten','edit-order','secondary')}${button('Duplizieren','duplicate-order','secondary')}${button('Löschen','delete-order','danger')}</div></div><div class="order-detail-right">${orderManufacturingPanel(order)}<div class="order-detail-add">${button(icon('plus')+' Produkt hinzufügen','new-line')}</div></div></div>${order.notes?`<p class="note">${esc(order.notes)}</p>`:''}</div><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['done','Fertig']].map(([v,t])=>`<button data-action="order-filter" data-id="${v}" class="${orderFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">Fertig-Haken buchen den Lagerabzug.</small></div>${lines.length?table(['Fertig','Produkt / Notiz','Anzahl','Status','Stückpreis','Summe','Lagerentnahme',''],lines.map(l=>`<tr class="status-row ${l.qty>0?(l.done?'done':l.status):'zero'}"><td><input type="checkbox" class="finish" aria-label="${esc(l.product)} fertigstellen" data-line="${l.id}" ${l.done?'checked':''} ${l.status==='cancel'?'disabled':''}></td><td><b>${esc(l.product)}</b>${l.note?`<small>${esc(l.note)}</small>`:''}</td><td class="num">${number(l.qty)}</td><td>${badge(l)}</td><td class="num">${money(state.prices[l.product])}</td><td class="num">${money(lineTotal(state,l))}</td><td><small>${({stock:'Endprodukt aus Lager',parts:'Direkte Bauteile',raw:'Aus Rohstoffen'})[l.mode]}</small></td><td>${button('Bearbeiten','edit-line','text',`data-id="${l.id}"`)}</td></tr>`)) :empty('Noch keine Positionen','Füge die gewünschten Endprodukte und Mengen hinzu.')}`;}
  return heading('Bestellung bearbeiten','Mehrere Produkte für einen Kunden.',button('← Zur Bestellübersicht','back-orders','secondary'))+`<section class="panel order-detail">${detail}</section>`;
 }
 function inventoryView(){const current=stock(state),need=plan(state,openLines());const list=items().filter(k=>matches(k,state.inventory[k].note)&&(inventoryFilter==='all'||inventoryFilter==='raw'&&!state.recipes[k]||inventoryFilter==='product'&&state.recipes[k]||inventoryFilter==='short'&&(need.buy[k]||need.make[k]||current[k]<0)));return heading('Lagerbestand','Einkäufe und fertige Bestellungen werden automatisch verrechnet.',button(icon('plus')+' Einkauf erfassen','new-purchase'))+`<div class="stats compact">${summary('Artikel im Lager',items().filter(k=>current[k]>0).length,'Mit positivem Bestand','inventory')}${summary('Fehlende Rohstoffe',Object.keys(need.buy).length,'Für offene Bestellungen','orders')}${summary('Zu fertigende Produkte',Object.keys(need.make).length,'Lagerbestand bereits berücksichtigt','manufacture')}</div><div class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle Artikel'],['raw','Rohstoffe'],['product','Produkte'],['short','Fehlmengen']].map(([v,t])=>`<button class="${inventoryFilter===v?'active':''}" data-action="inventory-filter" data-id="${v}">${t}</button>`).join('')}</div><small class="muted">${list.length} Artikel</small></div>${list.length?table(['Artikel','Art','Lagerbestand','Offener Bedarf','Noch benötigt','Notiz',''],list.map(k=>`<tr><td><b>${esc(k)}</b></td><td><span class="tag">${state.recipes[k]?'Produkt / Bauteil':'Rohstoff'}</span></td><td class="num ${current[k]<0?'negative':''}"><b>${number(current[k])}</b></td><td class="num">${number(need.demand[k])}</td><td class="num">${(need.buy[k]||need.make[k])?`<span class="badge open">${number(need.buy[k]||need.make[k])} ${state.recipes[k]?'herstellen':'beschaffen'}</span>`:'<span class="muted">—</span>'}</td><td>${esc(state.inventory[k].note)}</td><td>${button('Bestand korrigieren','adjust-stock','text',`data-item="${esc(k)}"`)}</td></tr>`)):empty('Keine Artikel gefunden','Passe Suche oder Filter an.')}</div><p class="footnote">Bestandskorrekturen erfassen einen einmaligen Zu- oder Abgang. Einkäufe bitte im Einkaufsbuch eintragen.</p>`;}
