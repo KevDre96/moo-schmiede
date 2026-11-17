@@ -414,11 +414,6 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 @media(max-width:1050px){.order-detail-actions-row{grid-template-columns:1fr;align-items:stretch}.order-detail-left .order-detail-buttons{margin-top:0}.order-detail-add{margin-top:0}}
 @media(max-width:600px){.order-detail-actions-row{display:flex;flex-direction:column;gap:12px}.order-detail-right .order-detail-add{align-self:stretch}.order-material-summary{padding:14px}.order-material-list{max-height:260px}}
 
-/* Bestätigung direkt in Moo Schmiede statt blockierbarem Browser-Popup */
-.personal-delete-question{font-size:14px;line-height:1.7;color:#f0e5d1;padding:0 25px;margin:20px 0 8px}
-.personal-delete-question b{color:#e8c472}
-.personal-delete-hint{font-size:11px;line-height:1.65;color:#b4a890;padding:0 25px;margin:0 0 20px}
-#confirm-personal-work-delete{cursor:pointer}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -870,26 +865,6 @@ function inventoryView(){const current=stock(state),need=plan(state,openLines())
 function purchasesView(){const list=state.purchases.filter(p=>matches(p.item,p.supplier,p.note)).slice().reverse();return heading('Einkäufe','Neue Ware erfassen. Dein Lager wächst automatisch mit.',button(icon('plus')+' Einkauf erfassen','new-purchase'))+`<div class="panel">${list.length?table(['Datum','Material / Artikel','Menge','Stückpreis','Gesamtpreis','Lieferant','Notizen',''],list.map(p=>`<tr><td>${date(p.date)}</td><td><b>${esc(p.item)}</b><small class="positive">Im Lager gebucht</small></td><td class="num">+${number(p.qty)}</td><td class="num">${money(p.price)}</td><td class="num">${p.qty===0?money(0):money(p.price===null?null:p.price*p.qty)}</td><td>${esc(p.supplier)}</td><td>${esc(p.note)}</td><td>${button('Bearbeiten','edit-purchase','text',`data-id="${p.id}"`)}</td></tr>`)):empty('Der nächste Einkauf wartet','Wähle z. B. Eisen, Kohle oder Kupfer und trage die gekaufte Menge ein.',button('Ersten Einkauf erfassen','new-purchase'))}</div><div class="callout">${icon('inventory')}<p><b>Einmal eintragen genügt.</b> Einkäufe bleiben im Verlauf stehen. Bearbeiten oder Löschen korrigiert den Lagerbestand entsprechend.</p></div>`;}
 function requirementTable(map,type='raw'){const current=stock(state);const keys=Object.keys(map).filter(k=>map[k]>1e-9);return keys.length?table(['Material / Produkt','Menge','Aktuell im Lager'],keys.map(k=>`<tr><td><b>${esc(k)}</b></td><td class="num"><span class="${type==='buy'?'negative':'gold'}">${number(map[k])}</span></td><td class="num">${number(current[k])}</td></tr>`)):empty('Kein Bedarf','Für diese Auswahl wird nichts benötigt.');}
 
-function confirmPersonalManufactureDeletion(id){
- const entry=state.personalManufacture.find(item=>item.id===id);
- if(!entry){toast('Dieser Eigenbedarfs-Eintrag wurde nicht gefunden.',true);return;}
- const dialog=$('#dialog');
- dialog.classList.remove('order-dialog');
- dialog.innerHTML=`<div class="dialog-head"><div class="eyebrow">MOO SCHMIEDE</div><button type="button" class="close" aria-label="Schließen">×</button><h2>Eigenbedarf löschen?</h2></div>
-  <p class="personal-delete-question">Möchtest du <b>${esc(entry.product)}</b> (${number(entry.qty)} Stück) wirklich aus „Für mich“ entfernen?</p>
-  <p class="personal-delete-hint">Nur dieser Eintrag wird gelöscht. Kundenbestellungen und Lagerbestände bleiben unverändert.</p>
-  <div class="dialog-actions"><div class="push"></div><button type="button" class="secondary close">Abbrechen</button><button type="button" class="danger" id="confirm-personal-work-delete">Endgültig löschen</button></div>`;
- dialog.querySelectorAll('.close').forEach(button=>button.addEventListener('click',()=>dialog.close()));
- dialog.querySelector('#confirm-personal-work-delete').addEventListener('click',()=>{
-   dialog.close();
-   mutate(()=>{
-     const before=state.personalManufacture.length;
-     state.personalManufacture=state.personalManufacture.filter(item=>item.id!==id);
-     if(state.personalManufacture.length===before)throw new Error('Der Eintrag wurde nicht gefunden.');
-   },'Eigenbedarf gelöscht');
- });
- dialog.showModal();
-}
 function personalManufactureModal(entry){
  modal(entry?'Eigenbedarf bearbeiten':'Produkt für mich planen',
    select('Produkt','product',products(),entry?.product,false)+
@@ -1543,7 +1518,7 @@ function bind(){
  'new-personal-work':()=>personalManufactureModal(),
  'edit-personal-work':()=>personalManufactureModal(state.personalManufacture.find(entry=>entry.id===id)),
  'toggle-personal-work':()=>mutate(()=>{const entry=state.personalManufacture.find(entry=>entry.id===id);if(!entry)return;entry.done=!entry.done;},'Eigenbedarf aktualisiert – ohne Lagerbuchung'),
- 'delete-personal-work':()=>confirmPersonalManufactureDeletion(id),
+ 'delete-personal-work':()=>mutate(()=>{const before=state.personalManufacture.length;state.personalManufacture=state.personalManufacture.filter(item=>item.id!==id);if(state.personalManufacture.length===before)throw new Error('Der Eintrag wurde nicht gefunden.');},'Eigenbedarf gelöscht'),
  'new-contact':()=>contactModal(),'edit-contact':()=>contactModal(state.contacts.find(c=>c.id===id)),
  'delete-contact-row':()=>{const contact=state.contacts.find(c=>c.id===id);if(!contact)return;if(confirm('Kontakt „'+contact.name+'“ wirklich löschen? Bestehende Bestellungen bleiben erhalten.'))mutate(()=>{state.contacts=state.contacts.filter(c=>c.id!==id);},'Kontakt gelöscht');},
  'price-tab':()=>{priceTab=id;render();},'edit-price':()=>{
