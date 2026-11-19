@@ -752,9 +752,6 @@ function orderTelegramNotice(o){
 function deleteOrderById(orderId){
  const target=state.orders.find(order=>order.id===orderId);
  if(!target){toast('Diese Bestellung wurde nicht gefunden.',true);return;}
- const hasFinished=target.lines.some(line=>line.done);
- const notice=hasFinished?'\n\nBereits abgebuchte Materialien bleiben im Lager als Bestandskorrektur berücksichtigt.':'';
- if(!confirm('Bestellung „'+target.title+'“ wirklich dauerhaft löschen?'+notice))return;
  mutate(()=>{
    // Verbrauchte Rohstoffe nach dem Entfernen der Bestellung weiterhin abbuchen.
    const booked={};
