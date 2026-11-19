@@ -414,6 +414,10 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 @media(max-width:1050px){.order-detail-actions-row{grid-template-columns:1fr;align-items:stretch}.order-detail-left .order-detail-buttons{margin-top:0}.order-detail-add{margin-top:0}}
 @media(max-width:600px){.order-detail-actions-row{display:flex;flex-direction:column;gap:12px}.order-detail-right .order-detail-add{align-self:stretch}.order-material-summary{padding:14px}.order-material-list{max-height:260px}}
 
+/* Gesamte Bestellung aus der Übersicht fertigstellen */
+.order-finish-quick{display:block;margin-top:7px;padding:5px 0;color:#e8c777!important;font-size:11px!important;font-weight:700!important;line-height:1.3;text-align:left;white-space:nowrap}
+.order-finish-quick:hover{color:#ffe0a0!important;text-decoration:underline}
+.order-finish-quick:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:3px}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -724,6 +728,18 @@ function dashboard(){
 }
 function getOrderStatus(o){const lines=o.lines.filter(l=>l.qty>0&&l.status!=='cancel');return !lines.length?'empty':lines.every(l=>l.done)?'done':lines.some(l=>l.status==='work'&&!l.done)?'work':'open';}
 function telegramIsPending(o){return getOrderStatus(o)==='done'&&!o.telegramSentAt;}
+function finishOrderFromOverview(orderId){
+ const order=state.orders.find(o=>o.id===orderId);
+ if(!order){toast('Bestellung nicht gefunden.',true);return;}
+ const active=order.lines.filter(l=>l.qty>0&&l.status!=='cancel');
+ if(!active.length){toast('Diese Bestellung hat keine aktiven Positionen.',true);return;}
+ if(active.every(l=>l.done))return;
+ // Gleicher Lagerabzug wie bei den Fertig-Haken; mutate macht Fehler rückgängig.
+ mutate(()=>{
+   for(const line of active)if(!line.done)complete(state,line,true);
+   order.telegramSentAt=null;
+ },'Bestellung fertig – Telegramm an Kunden senden!');
+}
 function orderTelegramNotice(o){
  if(getOrderStatus(o)!=='done')return '';
  const sent=!!o.telegramSentAt;
@@ -759,7 +775,7 @@ function orderOverview(){
  const list=state.orders.filter(o=>matches(o.title,o.customer,o.telegram,o.number)&&(overviewFilter==='all'||getOrderStatus(o)===overviewFilter));
  return heading('Bestellübersicht','Alle Kunden, Bestellungen und Fertigungsstände aus deiner Tabelle.',button('CSV exportieren','export-orders','secondary')+button(icon('plus')+' Bestellung hinzufügen','new-order'))+
  (state.orders.some(telegramIsPending)?`<div class="telegram-overview-reminder" role="status">✉ <b>${state.orders.filter(telegramIsPending).length} ${state.orders.filter(telegramIsPending).length===1?'fertige Bestellung wartet':'fertige Bestellungen warten'} auf ein Telegramm.</b> Bitte die Kunden benachrichtigen und danach als gesendet markieren.</div>`:'')+
- `<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um mehrere Produkte einzutragen und einzeln als fertig abzuhaken.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr class="order-row-clickable" data-order-id="${esc(o.id)}" tabindex="0" aria-label="Bestellung ${esc(o.title)} öffnen"><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${telegramCopyField(o.telegram)}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span>${st==='done'?(telegramIsPending(o)?`<button type="button" class="telegram-row-status pending telegram-row-status-button" data-action="telegram-sent" data-id="${esc(o.id)}" title="Nach dem Versenden hier klicken, um das Telegramm als gesendet zu markieren" aria-label="Telegramm für ${esc(o.customer||o.title)} als gesendet markieren">✉ Telegramm senden</button>`:`<span class="telegram-row-status sent">✓ Telegramm gesendet</span>`):''}</td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}${button('Löschen','delete-order-row','text order-delete-action',`data-id="${o.id}"`)}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
+ `<section class="panel"><div class="toolbar"><div class="tabs">${[['all','Alle'],['open','Offen'],['work','In Arbeit'],['done','Fertig'],['empty','Ohne Positionen']].map(([v,t])=>`<button data-action="overview-filter" data-id="${v}" class="${overviewFilter===v?'active':''}">${t}</button>`).join('')}</div><small class="muted">${list.length} von ${state.orders.length} Bestellungen</small></div><p class="table-hint">Bestellung öffnen, um Produkte zu bearbeiten, oder direkt in der Status-Spalte alle Positionen auf „Fertig“ setzen.</p>${list.length?table(['Bestellung / Gewerbe','Kunde','Telegramm','Positionen','Fortschritt','Bestellwert','Status','Aktionen'],list.map(o=>{const active=o.lines.filter(l=>l.qty>0&&l.status!=='cancel'),done=active.filter(l=>l.done).length,st=getOrderStatus(o);return `<tr class="order-row-clickable" data-order-id="${esc(o.id)}" tabindex="0" aria-label="Bestellung ${esc(o.title)} öffnen"><td><b>${esc(o.title)}</b></td><td>${esc(o.customer||'—')}</td><td>${telegramCopyField(o.telegram)}</td><td class="num">${active.length}</td><td><span class="progress-track"><span style="width:${active.length?100*done/active.length:0}%"></span></span><small>${done} von ${active.length} fertig</small></td><td class="num gold">${money(orderTotal(state,o))}</td><td><span class="badge ${st==='empty'?'cancel':st}">${({empty:'Ohne Positionen',open:'Offen',work:'In Arbeit',done:'Fertig'})[st]}</span>${(st==='open'||st==='work')?button('✓ Fertig stellen','finish-order-overview','text order-finish-quick',`data-id="${esc(o.id)}" title="Alle offenen Positionen dieser Bestellung fertigstellen und Lagerabzug buchen" aria-label="Bestellung ${esc(o.title)} vollständig fertigstellen"`):''}${st==='done'?(telegramIsPending(o)?`<button type="button" class="telegram-row-status pending telegram-row-status-button" data-action="telegram-sent" data-id="${esc(o.id)}" title="Nach dem Versenden hier klicken, um das Telegramm als gesendet zu markieren" aria-label="Telegramm für ${esc(o.customer||o.title)} als gesendet markieren">✉ Telegramm senden</button>`:`<span class="telegram-row-status sent">✓ Telegramm gesendet</span>`):''}</td><td><div class="actions">${button('Öffnen','open-order','text',`data-id="${o.id}"`)}${button('Bearbeiten','edit-order-row','text',`data-id="${o.id}"`)}${button('Löschen','delete-order-row','text order-delete-action',`data-id="${o.id}"`)}</div></td></tr>`})):empty('Keine Bestellungen gefunden','Passe den Filter oder die Suche an.')}</section>`;
 }
 // Im Spiel können je Arbeitsgang höchstens 100 Rezept-Herstellungen ausgeführt werden.
 // Mengen werden hier für ganze Herstellungen aufgerundet; die allgemeine
@@ -1508,6 +1524,7 @@ function bind(){
  'new-order':()=>orderModal(), 'edit-order':()=>orderModal(o),'open-order':()=>{selectedOrder=id;if(view!=='orders')go('orders');else render();},
  'duplicate-order':()=>mutate(()=>{const copy=clone(o);copy.id=uid();copy.title+=' – Kopie';copy.lines=copy.lines.map(l=>({...l,id:uid(),done:false,status:'open',booking:{}}));copy.telegramSentAt=null;state.orders.push(copy);selectedOrder=copy.id;},'Bestellung kopiert – alle Positionen sind offen'),
  'delete-order':()=>deleteOrderById(o?.id), 'delete-order-row':()=>deleteOrderById(id),
+ 'finish-order-overview':()=>finishOrderFromOverview(id),
  'copy-telegram':()=>copyTelegramToClipboard(b.dataset.telegram),
  'telegram-sent':()=>{const order=state.orders.find(o=>o.id===id);if(!order||getOrderStatus(order)!=='done')return;mutate(()=>{order.telegramSentAt=new Date().toISOString();},'Telegramm als gesendet markiert');},
  'telegram-reset':()=>{const order=state.orders.find(o=>o.id===id);if(!order)return;mutate(()=>{order.telegramSentAt=null;},'Telegramm-Erinnerung wieder aktiviert');},
