@@ -418,6 +418,14 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .order-finish-quick{display:block;margin-top:7px;padding:5px 0;color:#e8c777!important;font-size:11px!important;font-weight:700!important;line-height:1.3;text-align:left;white-space:nowrap}
 .order-finish-quick:hover{color:#ffe0a0!important;text-decoration:underline}
 .order-finish-quick:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:3px}
+
+/* Fertig-Häkchen direkt neben dem bestellten Produkt im Herstellungsplan */
+.order-needed-finish-label{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer}
+.order-needed-finish-label input{width:17px;height:17px;flex:none;margin:0;accent-color:#d8b565;cursor:pointer}
+.order-needed-finish-label b{font-weight:700}
+.order-needed-finish-hint{font-size:10px;font-weight:650;color:#e1c47b}
+.order-needed-finish-label:hover .order-needed-finish-hint{text-decoration:underline}
+.order-needed-finish-label input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -841,6 +849,20 @@ function orderMaterialSummary(order){
  ${result.errors.length?`<p class="order-material-warnings">${result.errors.map(esc).join(' · ')}</p>`:''}
  </section>`;
 }
+
+function finishOrderProduct(orderId,product){
+ const order=state.orders.find(o=>o.id===orderId);
+ if(!order){toast('Bestellung nicht gefunden.',true);return;}
+ const matching=order.lines.filter(l=>l.product===product&&l.qty>0&&l.status!=='cancel'&&!l.done);
+ if(!matching.length)return;
+ const active=order.lines.filter(l=>l.qty>0&&l.status!=='cancel');
+ const lastProduct=active.every(l=>l.done||matching.includes(l));
+ mutate(()=>{
+   for(const line of matching)complete(state,line,true);
+   if(lastProduct)order.telegramSentAt=null;
+ },lastProduct?'Bestellung fertig – Telegramm an Kunden senden!':product+' fertiggestellt – Lagerabzug gebucht');
+}
+
 function orderManufacturingPanel(order){
  const needs=plan(state,order.lines);
  const current=stock(state);
@@ -852,7 +874,7 @@ function orderManufacturingPanel(order){
  for(const item of list){
    const amount=needs.make[item],recipe=state.recipes[item];
    const ingredients=recipe?.ingredients||[];
-   rows.push(`<tr class="order-needed-product-row"><td><b>${esc(item)}</b></td><td class="num gold"><b>${number(amount)}</b></td><td class="num">${number(current[item]||0)}</td></tr>`);
+   rows.push(`<tr class="order-needed-product-row"><td><label class="order-needed-finish-label"><input type="checkbox" class="order-needed-finish" data-order-id="${esc(order.id)}" data-product="${esc(item)}" aria-label="${esc(item)} fertigstellen"><b>${esc(item)}</b><span class="order-needed-finish-hint">Fertig</span></label></td><td class="num gold"><b>${number(amount)}</b></td><td class="num">${number(current[item]||0)}</td></tr>`);
    const details=ingredients.length?ingredients.map(ing=>{
      const needed=typeof ing.qty==='number'&&recipe.yield>0?number(Math.ceil(amount/recipe.yield-1e-9)*ing.qty):'?';
      return `<span class="order-needed-material ${needed==='?'?'order-needed-material-unknown':''}">${needed} × ${esc(ing.item)}</span>`;
@@ -1556,6 +1578,9 @@ function bind(){
  'edit-recipe':()=>editRecipeModal(k),
  'export':backup,'export-csv':()=>{const curr=stock(state),rows=[['Artikel','Bestand','Notiz'],...items().map(k=>[k,curr[k],state.inventory[k].note])];download('Moo_Schmiede_Lager_'+today()+'.csv','\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(';')).join('\r\n'),'text/csv;charset=utf-8');}
  };try{actions[action]?.();}catch(e){toast(e.message,true);}});
+ document.querySelectorAll('.order-needed-finish').forEach(input=>input.onchange=()=>{
+   if(input.checked)finishOrderProduct(input.dataset.orderId,input.dataset.product);
+ });
  document.querySelectorAll('.finish').forEach(input=>input.onchange=()=>{
  const order=state.orders.find(o=>o.lines.some(l=>l.id===input.dataset.line));
  const line=order?.lines.find(l=>l.id===input.dataset.line);
