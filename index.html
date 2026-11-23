@@ -845,7 +845,7 @@ function deleteOrderById(orderId){
 function buildOrderTelegramText(order){
  const active=order.lines.filter(line=>line.status!=='cancel'&&line.qty>0);
  if(!active.length)return '';
- const out=['Hey deine Bestellung ist fertig',''];
+ const out=['Hey','Deine Bestellung ist fertig',''];
  for(const line of active){
   const price=state.prices[line.product];
   const hasPrice=typeof price==='number'&&Number.isFinite(price);
