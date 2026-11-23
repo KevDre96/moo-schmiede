@@ -502,25 +502,8 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .smelt-extra-list li strong{white-space:normal;text-align:right}
 
 
-/* Angebots- und Stückpreisübersicht pro Gewerk */
-.gewerbe-panel{padding:24px}
-.gewerbe-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
-.gewerbe-tabs button{background:#232018;border:1px solid #5b4b32;border-radius:8px;color:#dfd3bb;padding:9px 13px;font-size:11px}
-.gewerbe-tabs button.active{background:#d8b56529;border-color:var(--gold);color:#f1cf8b}
-.gewerbe-tabs small{font-size:10px;margin-left:5px}
-.gewerbe-toolbar{display:flex;align-items:end;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.gewerbe-toolbar label{display:flex;flex-direction:column;gap:7px;font-size:11px;color:#c5bca9;width:min(340px,100%)}
-.gewerbe-toolbar input{min-height:40px;width:100%}
-.gewerbe-hint{margin:15px 0;color:#c4bba8;font-size:11px;line-height:1.65}
-.gewerbe-price-table input{width:105px;max-width:100%;min-height:37px;color:#ebd39d;text-align:right}
-.gewerbe-price-table .gewerbe-quantity{width:85px}
-.gewerbe-money-input{display:inline-flex;align-items:center;gap:5px}
-.gewerbe-money-input span{color:var(--gold)}
-.gewerbe-total-bar{display:flex;justify-content:flex-end;gap:32px;flex-wrap:wrap;border-top:1px solid #625139;margin-top:17px;padding-top:20px}
-.gewerbe-total-bar>div{display:flex;flex-direction:column;text-align:right;gap:7px}
-.gewerbe-total-bar b,.gewerbe-total-bar strong{color:var(--gold);font:700 20px Georgia,serif}
-.gewerbe-total-bar .negative{color:var(--red)}
-@media(max-width:650px){.gewerbe-panel{padding:14px}.gewerbe-total-bar{gap:15px;justify-content:space-between}.gewerbe-price-table input{width:80px}.gewerbe-total-bar strong{font-size:18px}}
+/* Gewerbe-Preisliste wie das Bestelltelegramm */
+.gewerbe-telegram-panel .order-telegram-text{min-height:440px}
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -749,7 +732,7 @@ const icons={dashboard:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="
 const icon=(name)=>`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.inventory}</svg>`;
 const nav=[['dashboard','Dashboard'],['orders','Bestellungen'],['order-telegram','Bestellung Telegramm'],['archived-orders','Alte Bestellungen'],['inventory','Lagerbestand'],['purchases','Einkäufe'],['manufacture','Herstellung'],['smelt','Schmelze'],['recipes','Rezepte'],['prices','Preise'],['gewerbe-prices','Gewerbe-Preisliste'],['contacts','Adressbuch'],['settings','Sicherung & Daten']];
 let overviewFilter='all',selectedTelegramOrder=null;
-let state,initial,view=location.hash.slice(1)||'dashboard',query='',selectedOrder=null,lastSaved='',calcLines=[],smeltQty={},inventoryFilter='all',orderFilter='all',priceTab='product',priceSearch='',contactSearch='',gewerbeTab='Büchsenmacher',gewerbeQuantities={},gewerbePrices={},gewerbeFilter='';
+let state,initial,view=location.hash.slice(1)||'dashboard',query='',selectedOrder=null,lastSaved='',calcLines=[],smeltQty={},inventoryFilter='all',orderFilter='all',priceTab='product',priceSearch='',contactSearch='',gewerbeTab='Büchsenmacher';
 const cloud=await startMooCloud();
 try {
  initial=clone(PUBLIC_SEED);
@@ -1297,111 +1280,66 @@ function recipesView(){const list=products().filter(k=>matches(k,...state.recipe
 const GEWERBE_PAGE_MARKER=true;
 
 const gewerbeKatalog={"Büchsenmacher":["Gehärter pistolen verschluss","Gehärteter Gewehr-Lauf","Gehärteter Gewehr-Verschluss","Gehärteter Pistolen-Lauf","Gehärteter Repeater-Lauf","Gehärteter Repeater-Verschluss","Gehärteter Revo-Lauf","Gehärteter Schrotflinten-Verschluss","Gehärteter Schrottflinten-Lauf","Gewehr-Lauf","Gewehr-Verschluss","Patronenespitzen Express","Patronenhülsen Schrot","Patronenspitzen","Patronenspitzen Schrott","Patronnenhülsen","Patronnenhülsen Express","Pistolen-Lauf","Pistolen-Verschluss","Repetier-Lauf","Repetier-Verschluss","Revolver-Lauf","Revolver-Verschluss","Schrotflinten-Lauf","Schrotflinten-Verschluss","Verstärkte Revotrommel","Eisenbarren","Gehärteter Eisenbarren","Schraubenpaket"],"Schreiner":["Holznagel","Holzsäge","Sägeblätter","Nägel","Schraube","Schraubenpaket","Eisenwinkel","Fassring"],"Kutschenbauer":["Eisenachse","Eisenfeder","Bremssystem","Nabe","Eisenplatten","Bolzen","Zug-Reparaturset"],"Farmer":["Axt","Axtkopf","Gartenschaufel","Gartenschere","Rechenkopf","Schaufelblatt","Scherblatt","Schere","Sichel","Gerbermesser","Hufeisenzange","Hufkontroll-Werkzeug","Hufkratzer","Goldene Axt","Verbesserter Axtkopf","Spitzhacke","Spitzhackenkopf","Goldene SpitzAxt","Verstärkter Spitzhackenkopf","Goldpfanne","Dose","Nägel"],"Pferdetrainer":["Rennhufeisen"],"Allgemein & Materialien":["Bleibarren","Eisenbarren","Gehärteter Eisenbarren","Goldbarren","Kupferbarren","Messingbarren","Silberbarren","Holzkohle","Eisenextrakt","Eisenbündel","Eisenhammer","Gussform-Rohling","Werkzeugrohling","Flussmittel","Lösungsmittel","Brecheisen","Dietrich","Grablaterne","Laterne","Laternen","Messer rustic","Metallbox","Spritzennadel","Stromkabel","Zimmerleuchte"]};
-function gewerbeArtikel(){return (gewerbeKatalog[gewerbeTab]||[]).filter(item=>Object.hasOwn(state.prices,item)).slice().sort((a,b)=>a.localeCompare(b,'de'));}
-function gewerbeKey(item){return gewerbeTab+'||'+item;}
-function gewerbeStueckzahl(item){return gewerbeQuantities[gewerbeKey(item)]||0;}
-function gewerbeStueckpreis(item){const k=gewerbeKey(item);return Object.hasOwn(gewerbePrices,k)?gewerbePrices[k]:state.prices[item];}
-function gewerbeSummen(){
- const selected=gewerbeArtikel().filter(item=>gewerbeStueckzahl(item)>0);
- return {selected,missing:selected.filter(item=>!Number.isFinite(gewerbeStueckpreis(item))),
-   total:selected.reduce((sum,item)=>sum+(Number.isFinite(gewerbeStueckpreis(item))?gewerbeStueckzahl(item)*gewerbeStueckpreis(item):0),0)};
+
+function gewerbeArtikel(){
+ return (gewerbeKatalog[gewerbeTab]||[])
+  .filter(item=>Object.hasOwn(state.prices,item))
+  .slice().sort((a,b)=>a.localeCompare(b,'de'));
+}
+function gewerbePreislisteText(){
+ return gewerbeArtikel().map(item=>{
+  const price=state.prices[item];
+  const formatted=typeof price==='number'&&Number.isFinite(price)?money(price):'Preis fehlt';
+  return 'Produkt: '+item+'\nStückpreis: '+formatted;
+ }).join('\n\n');
 }
 function gewerbePreislisteView(){
- const articles=gewerbeArtikel(),totals=gewerbeSummen();
- const categories=Object.entries(gewerbeKatalog).map(([name,items])=>
-   `<button type="button" class="${name===gewerbeTab?'active':''}" data-action="gewerbe-category" data-id="${esc(name)}" aria-pressed="${name===gewerbeTab}">${esc(name)} <small>${items.length}</small></button>`).join('');
- const rows=articles.map(item=>{
-  const qty=gewerbeStueckzahl(item),p=gewerbeStueckpreis(item),ok=Number.isFinite(p)&&p>=0;
-  return `<tr class="gewerbe-row" data-product="${esc(item)}">
-   <td><b>${esc(item)}</b></td>
-   <td class="num"><input class="gewerbe-quantity" data-item="${esc(item)}" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="${qty||''}" aria-label="Stückzahl ${esc(item)}"></td>
-   <td class="num"><div class="gewerbe-money-input"><input class="gewerbe-unit-price" data-item="${esc(item)}" type="text" inputmode="decimal" autocomplete="off" placeholder="Preis fehlt" value="${ok?esc(String(p).replace('.',',')):''}" aria-label="Stückpreis ${esc(item)}"><span>$</span></div></td>
-   <td class="num gewerbe-position-total ${qty&&!ok?'negative':''}">${qty?(ok?money(qty*p):'Preis fehlt'):money(0)}</td></tr>`;
- });
- return heading('Gewerbe-Preisliste','Wähle ein Gewerk, trage Stückzahlen und Stückpreise ein und sieh den Gesamtpreis.')+
- `<section class="panel gewerbe-panel">
-  <div class="gewerbe-tabs" aria-label="Gewerke">${categories}</div>
-  <div class="gewerbe-toolbar">
-    <label>Produkt suchen<input id="gewerbe-search" type="search" placeholder="Produkt suchen …" autocomplete="off" value="${esc(gewerbeFilter)}"></label>
-    <div class="actions">${button(icon('copy')+' Preisliste kopieren','gewerbe-copy','secondary')}${button('Zurücksetzen','gewerbe-reset','text')}</div>
-  </div>
-  <p class="gewerbe-hint">${articles.length} Produkte für <b>${esc(gewerbeTab)}</b>. Der Stückpreis wird aus deinen gespeicherten Verkaufspreisen vorausgefüllt. Du kannst ihn für diese Liste ändern, ohne den gespeicherten Preis zu überschreiben.</p>
-  ${table(['Produkt','Stückzahl','Stückpreis','Gesamtpreis'],rows,'gewerbe-price-table')}
-  <p class="muted" id="gewerbe-no-matches" hidden>Keine passenden Produkte gefunden.</p>
-  <div class="gewerbe-total-bar"><div><small>Positionen mit Stückzahl</small><b id="gewerbe-selected-count">${number(totals.selected.length)}</b></div>
-    <div><small>Positionen ohne Preis</small><b id="gewerbe-missing-count" class="${totals.missing.length?'negative':''}">${number(totals.missing.length)}</b></div>
-    <div><small>Gesamtsumme</small><strong id="gewerbe-grand-total">${money(totals.total)}</strong></div></div>
- </section>
- <p class="footnote">Fehlende Preise werden nicht mitgerechnet und gesondert angezeigt. Produkte können bei mehreren Gewerken vorkommen. Stückzahlen und Änderungen an Stückpreisen gelten nur in diesem geöffneten Rechner. Die Datenbank und die ursprüngliche Preisübersicht bleiben unverändert.</p>`;
-}
-function gewerbeParseQty(text){
- const s=text.trim();if(!s)return 0;
- if(!/^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(s))return NaN;
- const n=Number(s.replace(/\./g,''));return Number.isSafeInteger(n)&&n<=1000000?n:NaN;
-}
-function gewerbeParsePrice(text){
- const s=text.trim();if(!s)return null;
- let num;
- if(/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(s))num=s.replace(/\./g,'').replace(',','.');
- else if(/^\d+(?:[.,]\d{1,2})?$/.test(s))num=s.replace(',','.');
- else return NaN;
- const n=Number(num);return Number.isFinite(n)&&n>=0&&n<=10000000?n:NaN;
-}
-function gewerbeUpdateTotals(){
- for(const row of document.querySelectorAll('.gewerbe-row')){
-  const item=row.dataset.product,qty=gewerbeStueckzahl(item),price=gewerbeStueckpreis(item);
-  const ok=Number.isFinite(price)&&price>=0,cell=row.querySelector('.gewerbe-position-total');
-  cell.textContent=qty?(ok?money(qty*price):'Preis fehlt'):money(0);
-  cell.classList.toggle('negative',qty>0&&!ok);
- }
- const totals=gewerbeSummen();
- const count=$('#gewerbe-selected-count'),missing=$('#gewerbe-missing-count'),sum=$('#gewerbe-grand-total');
- if(count)count.textContent=number(totals.selected.length);
- if(missing){missing.textContent=number(totals.missing.length);missing.classList.toggle('negative',totals.missing.length>0);}
- if(sum)sum.textContent=money(totals.total);
+ const names=Object.keys(gewerbeKatalog);
+ const items=gewerbeArtikel();
+ const options=names.map(name=>
+  `<option value="${esc(name)}" ${name===gewerbeTab?'selected':''}>${esc(name)} (${gewerbeKatalog[name].length} Produkte)</option>`
+ ).join('');
+ const output=gewerbePreislisteText();
+ return heading('Gewerbe-Preisliste','Gewerk auswählen und Produkte mit ihren Stückpreisen direkt kopieren.')+
+ `<section class="panel order-telegram-panel gewerbe-telegram-panel">
+   <div class="order-telegram-top">
+    <label class="order-telegram-select-label" for="gewerbe-select"><b>Gewerk auswählen</b>
+     <select id="gewerbe-select" aria-label="Gewerk für die Preisliste auswählen">${options}</select>
+    </label>
+    <div class="order-telegram-toolbar">
+     ${button(icon('copy')+' Alles kopieren','gewerbe-copy','primary')}
+    </div>
+   </div>
+   <p class="order-telegram-description">${items.length} Produkte aus „${esc(gewerbeTab)}“ – nur Produktname und Stückpreis, ohne Mengen oder Gesamtsumme.</p>
+   ${output?`<textarea id="gewerbe-text" class="order-telegram-text" readonly spellcheck="false" aria-label="Gewerbe-Preisliste zum Kopieren">${esc(output)}</textarea>`:
+   '<p class="order-telegram-empty">Für dieses Gewerk sind keine Produkte hinterlegt.</p>'}
+   <p class="order-telegram-help">Es gelten die aktuellen Verkaufspreise deiner Schmiede. Fehlende Preise werden als „Preis fehlt“ angezeigt. Über „Alles kopieren“ wird nur der Text aus der Vorschau übernommen.</p>
+  </section>`;
 }
 function bindGewerbePreisliste(){
- const search=$('#gewerbe-search');
- if(search){
-  const update=()=>{
-   gewerbeFilter=search.value;let count=0;
-   document.querySelectorAll('.gewerbe-row').forEach(row=>{
-    const show=row.dataset.product.toLocaleLowerCase('de-DE').includes(gewerbeFilter.trim().toLocaleLowerCase('de-DE'));
-    row.hidden=!show;row.style.display=show?'':'none';if(show)count++;
-   });
-   const empty=$('#gewerbe-no-matches');if(empty)empty.hidden=count>0;
-  };
-  search.addEventListener('input',update);update();
- }
- document.querySelectorAll('.gewerbe-quantity,.gewerbe-unit-price').forEach(input=>input.addEventListener('input',()=>{
-  const quantity=input.classList.contains('gewerbe-quantity');
-  const value=quantity?gewerbeParseQty(input.value):gewerbeParsePrice(input.value);
-  if(Number.isNaN(value)){input.setCustomValidity(quantity?'Bitte eine ganze Stückzahl bis 1.000.000 eingeben.':'Ungültiger Stückpreis. Beispiel: 3,50');return;}
-  input.setCustomValidity('');
-  if(quantity)gewerbeQuantities[gewerbeKey(input.dataset.item)]=value;
-  else gewerbePrices[gewerbeKey(input.dataset.item)]=value;
-  gewerbeUpdateTotals();
- }));
+ const dropdown=$('#gewerbe-select');
+ if(dropdown)dropdown.addEventListener('change',()=>{
+  if(Object.hasOwn(gewerbeKatalog,dropdown.value)){
+   gewerbeTab=dropdown.value;
+   render();
+  }
+ });
 }
 async function gewerbeCopyPreisliste(){
- const totals=gewerbeSummen();
- const list=totals.selected.length?totals.selected:gewerbeArtikel();
- const lines=['Moo Schmiede – Preisliste','Gewerk: '+gewerbeTab,''];
- for(const item of list){
-  const qty=gewerbeStueckzahl(item),price=gewerbeStueckpreis(item);
-  lines.push(item+' | Stückzahl: '+number(qty)+' | Stückpreis: '+(Number.isFinite(price)?money(price):'Preis fehlt')+
-   ' | Gesamtpreis: '+(qty?(Number.isFinite(price)?money(qty*price):'Preis fehlt'):money(0)));
- }
- lines.push('','GESAMTSUMME: '+money(totals.total)+(totals.missing.length?' (bei '+totals.missing.length+' Positionen fehlt der Preis)':''));
- const value=lines.join('\n');
+ const value=$('#gewerbe-text')?.value;
+ if(!value){toast('Keine Produkte zum Kopieren vorhanden.',true);return;}
  try{
   if(!navigator.clipboard?.writeText)throw new Error('Zwischenablage nicht verfügbar');
-  await navigator.clipboard.writeText(value);toast('Gewerbe-Preisliste kopiert');
- }catch(e){
-  const el=document.createElement('textarea');el.value=value;el.setAttribute('readonly','');
-  el.style.position='fixed';el.style.left='-9999px';document.body.appendChild(el);el.select();
-  let ok=false;try{ok=document.execCommand('copy');}catch(ignore){}
-  el.remove();toast(ok?'Gewerbe-Preisliste kopiert':'Kopieren fehlgeschlagen.',!ok);
+  await navigator.clipboard.writeText(value);
+  toast('Gewerbe-Preisliste kopiert');
+ }catch(error){
+  const input=document.createElement('textarea');
+  input.value=value;input.setAttribute('readonly','');
+  input.style.position='fixed';input.style.left='-9999px';
+  document.body.appendChild(input);input.focus();input.select();
+  let copied=false;try{copied=document.execCommand('copy');}catch(ignore){}
+  input.remove();
+  toast(copied?'Gewerbe-Preisliste kopiert':'Kopieren fehlgeschlagen. Bitte den Text manuell kopieren.',!copied);
  }
 }
 function pricesView(){const list=(priceTab==='product'?products():items().filter(k=>!state.recipes[k])).filter(k=>matches(k));return heading('Preise & Kalkulation','Eigene Endpreise und Rohstoffpreise – Änderungen gelten sofort für offene Bestellungen.')+`<div class="panel price-search-panel"><div class="toolbar"><div class="tabs"><button data-action="price-tab" data-id="product" class="${priceTab==='product'?'active':''}">Produktpreise</button><button data-action="price-tab" data-id="raw" class="${priceTab==='raw'?'active':''}">Rohstoffpreise</button></div><small class="muted">0 $ ist ein gültiger Preis. Leer bedeutet: Preis fehlt.</small></div><div class="price-search-row"><label for="price-product-search">Produkt suchen</label><input id="price-product-search" type="search" placeholder="${priceTab==='product'?'Produkt eingeben, z. B. Nägel …':'Rohstoff eingeben, z. B. Eisen …'}" autocomplete="off" value="${esc(priceSearch)}" aria-label="Produkt oder Rohstoff in der Preisliste suchen"><span id="price-search-count" class="price-search-count" aria-live="polite"></span></div><p id="price-search-empty" class="price-search-empty" hidden>Keine passenden Artikel gefunden.</p>${table(priceTab==='product'?['Produkt','Verkaufspreis / Stück','Materialkosten / Stück','Differenz','']:['Rohstoff','Einkaufspreis / Stück',''],list.map(k=>{const p=priceTab==='product'?state.prices[k]:state.rawPrices[k],c=materialCost(state,k);return `<tr><td><b>${esc(k)}</b></td><td class="num gold">${priceTab==='raw'&&typeof state.rawPriceAlternatives?.[k]==='number'?money(p)+' / '+money(state.rawPriceAlternatives[k]):money(p)}</td>${priceTab==='product'?`<td class="num">${money(c)}</td><td class="num ${c!==null&&typeof p==='number'&&p-c<0?'negative':'positive'}">${c!==null&&typeof p==='number'?money(p-c):'—'}</td>`:''}<td>${button('Preis ändern','edit-price','text',`data-item="${esc(k)}"`)}</td></tr>`}))}</div><p class="footnote">Materialkosten werden über alle Rezeptstufen berechnet. Arbeitszeit und zusätzliche Aufschläge sind nicht enthalten.${priceTab==='raw'?' Bei zwei Rohstoffpreisen wird für die Kalkulation der erste Preis verwendet.':''}</p>`;}
@@ -1997,9 +1935,7 @@ function bind(){
  'finish-order-overview':()=>finishOrderFromOverview(id),
  'copy-telegram':()=>copyTelegramToClipboard(b.dataset.telegram),
  'copy-order-telegram':()=>copyOrderTelegramText(),
- 'gewerbe-category':()=>{if(Object.hasOwn(gewerbeKatalog,id)){gewerbeTab=id;gewerbeFilter='';render();}},
  'gewerbe-copy':()=>gewerbeCopyPreisliste(),
- 'gewerbe-reset':()=>{for(const item of gewerbeArtikel()){delete gewerbeQuantities[gewerbeKey(item)];delete gewerbePrices[gewerbeKey(item)];}render();},
  'reset-smelt':()=>{smeltQty={};render();},
  'telegram-sent':()=>{const order=state.orders.find(o=>o.id===id);if(!order||getOrderStatus(order)!=='done')return;mutate(()=>{order.telegramSentAt=new Date().toISOString();},'Telegramm als gesendet markiert');},
  'telegram-reset':()=>{const order=state.orders.find(o=>o.id===id);if(!order)return;mutate(()=>{order.telegramSentAt=null;},'Telegramm-Erinnerung wieder aktiviert');},
