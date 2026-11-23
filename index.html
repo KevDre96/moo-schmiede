@@ -491,6 +491,16 @@ dialog.order-dialog{width:min(790px,calc(100% - 24px));max-height:94dvh;overflow
 .smelt-recipe-notes summary{font-size:11px}
 .smelt-recipe-notes p{color:#d4a199;font-size:11px;line-height:1.6}
 @media(max-width:850px){.smelt-converter{grid-template-columns:1fr}.smelt-yield-header>strong{font-size:21px}}
+
+/* Schmelze: direkte Rezeptzutaten einschließlich Gussform-Rohling */
+.smelt-direct-recipe{margin:13px 0 4px;padding:10px 12px;border:1px solid #6a5737;border-radius:7px;background:#2a2419;font-size:11px;line-height:1.75;color:#e9d3a5}
+.smelt-direct-recipe b{color:#f5d28a}
+.smelt-direct-recipe span{color:#bcb0a0}
+.smelt-raw-breakdown{margin:15px 0 0;padding-top:12px;border-top:1px solid #504531}
+.smelt-raw-breakdown summary{color:#ddbf81;font-size:11px}
+.smelt-raw-breakdown p{font-size:10px;line-height:1.6;color:#c9baa2}
+.smelt-extra-list li strong{white-space:normal;text-align:right}
+
 </style></head>
 <body><div id="app"><p class="loading">Die Esse wird angeheizt …</p></div><dialog id="dialog"></dialog><div id="toast" role="status"></div><script>
 // Nur öffentliche Projektwerte! Keine Geheimschlüssel in eine GitHub-Webseite schreiben.
@@ -1206,14 +1216,36 @@ function smeltResults(){
   const consumed=needed[b.principal]||0;
   const remaining=Math.max(0,available-consumed);
   const additional=Object.entries(needed).filter(([item,qty])=>item!==b.principal&&qty>0);
+  // Zwischenprodukte wie Gussform-Rohling und Goldbarren NICHT in den
+  // Rohstoffbedarf auflösen, wenn das Originalrezept angezeigt wird.
+  const direct=(state.recipes[b.product]?.ingredients||[])
+    .filter(i=>Number.isFinite(i.qty)&&i.qty>0&&!/eisenhammer/i.test(i.item));
+  const hasIntermediate=direct.some(i=>state.recipes[i.item]?.ingredients?.length>0);
+  const recipeText=direct.map(i=>number(i.qty)+' × '+esc(i.item)).join(' + ')+
+    ' → '+number(b.yield)+' × '+esc(b.product);
+  const directHtml=direct.map(i=>{
+    const qty=batches*i.qty;
+    const already=smeltQty[i.item]||0;
+    const hasOwn=already>0;
+    return `<li><span><b>${esc(i.item)}</b><small>${number(i.qty)} je Schmelzvorgang${hasOwn?' · '+number(already)+' eingegeben':''}</small></span>
+      <strong class="smelt-needs-more">${number(qty)} × benötigt</strong></li>`;
+  }).join('');
   const neededHtml=additional.length?additional.map(([item,qty])=>{
    const entered=smeltQty[item]||0,missing=Math.max(0,qty-entered);
    return `<li><span><b>${esc(item)}</b><small>${number(qty)} benötigt${entered>0?' · '+number(entered)+' eingegeben':''}</small></span><strong class="${missing>0?'smelt-needs-more':'smelt-available'}">${missing>0?number(missing)+' zusätzlich nötig':'Ausreichend eingegeben'}</strong></li>`;
   }).join(''):'<li><span>Keine weiteren Zutaten erforderlich.</span></li>';
   return `<article class="smelt-yield-card">
-   <div class="smelt-yield-header"><div><span class="smelt-material-source">Aus ${number(available)} × ${esc(b.principal)}</span><h3>${esc(b.product)}</h3></div><strong>${number(batches*b.yield)} <small>Stück möglich</small></strong></div>
+   <div class="smelt-yield-header"><div><span class="smelt-material-source">Aus ${number(available)} × ${esc(b.principal)}</span><h3>${esc(b.product)}</h3></div><strong>${number(batches*b.yield)} <small>Stück theoretisch möglich</small></strong></div>
    <div class="smelt-yield-facts"><span>${number(batches)} Schmelzvorgänge</span><span>${number(consumed)} × ${esc(b.principal)} benötigt</span><span>${number(remaining)} Rest</span></div>
-   ${batches?`<h4>Weitere benötigte Zutaten</h4><ul class="smelt-extra-list">${neededHtml}</ul>`:
+   ${hasIntermediate?`<p class="smelt-direct-recipe"><b>Rezept:</b> ${recipeText}<br><span>1 × Eisenhammer (permanentes Werkzeug)</span></p>`:''}
+   ${batches?(hasIntermediate?
+   `<h4>Direkte Zutaten für ${number(batches*b.yield)} × ${esc(b.product)}</h4>
+    <ul class="smelt-extra-list">${directHtml}<li><span><b>Eisenhammer</b><small>Permanentes Werkzeug, kein Verbrauch</small></span><strong class="smelt-available">1 × vorhanden halten</strong></li></ul>
+    <details class="smelt-raw-breakdown"><summary>Rohstoffe für die Vorstufen anzeigen</summary>
+      <p>Damit kannst du ${esc(b.product)} und seine Zwischenprodukte herstellen. Die Angaben sind keine zusätzlichen Zutaten zur direkten Rezeptliste.</p>
+      <ul class="smelt-extra-list">${neededHtml}</ul>
+    </details>`:
+   `<h4>Weitere benötigte Zutaten</h4><ul class="smelt-extra-list">${neededHtml}</ul>`):
    '<p class="smelt-no-yield">Noch nicht genug Hauptmaterial für einen vollständigen Schmelzvorgang.</p>'}
   </article>`;
  }).join('');
