@@ -1287,11 +1287,14 @@ function gewerbeArtikel(){
   .slice().sort((a,b)=>a.localeCompare(b,'de'));
 }
 function gewerbePreislisteText(){
- return gewerbeArtikel().map(item=>{
+ const artikel=gewerbeArtikel();
+ if(!artikel.length)return '';
+ const liste=artikel.map(item=>{
   const price=state.prices[item];
   const formatted=typeof price==='number'&&Number.isFinite(price)?money(price):'Preis fehlt';
   return 'Produkt: '+item+'\nStückpreis: '+formatted;
  }).join('\n\n');
+ return 'Hey\ndas ist meine preisliste\n\n'+liste+'\n\nGrüße\nMoo Goodfella\nSchmiede Black Iron\nBrieftauben Kürzel Moo';
 }
 function gewerbePreislisteView(){
  const names=Object.keys(gewerbeKatalog);
